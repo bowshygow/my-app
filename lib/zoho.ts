@@ -1,0 +1,228 @@
+interface ZohoTokenResponse {
+  access_token: string;
+  scope: string;
+  api_domain: string;
+  token_type: string;
+  expires_in: number;
+}
+
+interface ZohoSalesOrder {
+  salesorder_id: string;
+  salesorder_number: string;
+  date: string;
+  customer_id: string;
+  customer_name: string;
+  line_items: ZohoLineItem[];
+  total: number;
+  currency_code: string;
+}
+
+interface ZohoLineItem {
+  line_item_id: string;
+  item_id: string;
+  name: string;
+  quantity: number;
+  rate: number;
+  item_total: number;
+}
+
+interface ZohoInvoiceResponse {
+  code: number;
+  message: string;
+  invoice: {
+    invoice_id: string;
+    invoice_number: string;
+    invoice_url: string;
+  };
+}
+
+class ZohoAPI {
+  private accessToken: string | null = null;
+  private tokenExpiry: number = 0;
+
+  constructor(
+    private clientId: string,
+    private clientSecret: string,
+    private refreshToken: string,
+    private organizationId: string,
+    private apiDomain: string = 'https://www.zohoapis.in'
+  ) {}
+
+  /**
+   * Refresh access token
+   */
+  async refreshAccessToken(): Promise<string> {
+    const now = Date.now();
+    
+    // Check if token is still valid (with 5 minute buffer)
+    if (this.accessToken && this.tokenExpiry > now + 300000) {
+      return this.accessToken;
+    }
+
+    try {
+      const response = await fetch('https://accounts.zoho.in/oauth/v2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          refresh_token: this.refreshToken,
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+          redirect_uri: 'http://www.zoho.com/books',
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to refresh token: ${response.statusText}`);
+      }
+
+      const data: ZohoTokenResponse = await response.json();
+      
+      this.accessToken = data.access_token;
+      this.tokenExpiry = now + (data.expires_in * 1000);
+
+      return this.accessToken;
+    } catch (error) {
+      console.error('Error refreshing Zoho access token:', error);
+      throw new Error('Failed to refresh Zoho access token');
+    }
+  }
+
+  /**
+   * Get sales order by ID
+   */
+  async getSalesOrder(salesOrderId: string): Promise<ZohoSalesOrder> {
+    const token = await this.refreshAccessToken();
+    
+    try {
+      const response = await fetch(
+        `${this.apiDomain}/books/v3/salesorders/${salesOrderId}?organization_id=${this.organizationId}`,
+        {
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch sales order: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.code !== 0) {
+        throw new Error(`Zoho API error: ${data.message}`);
+      }
+
+      return data.salesorder;
+    } catch (error) {
+      console.error('Error fetching sales order:', error);
+      throw new Error('Failed to fetch sales order from Zoho');
+    }
+  }
+
+  /**
+   * Create invoice in Zoho
+   */
+  async createInvoice(invoiceData: {
+    customer_id: string;
+    custom_fields: Array<{ customfield_id: string; value: string }>;
+    line_items: Array<{ item_id: string; quantity: number }>;
+  }): Promise<ZohoInvoiceResponse> {
+    const token = await this.refreshAccessToken();
+    
+    try {
+      const response = await fetch(
+        `${this.apiDomain}/books/v3/invoices?organization_id=${this.organizationId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(invoiceData),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to create invoice: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.code !== 0) {
+        throw new Error(`Zoho API error: ${data.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error creating invoice:', error);
+      throw new Error('Failed to create invoice in Zoho');
+    }
+  }
+
+  /**
+   * Get organization info
+   */
+  async getOrganizationInfo(): Promise<any> {
+    const token = await this.refreshAccessToken();
+    
+    try {
+      const response = await fetch(
+        `${this.apiDomain}/books/v3/organizations?organization_id=${this.organizationId}`,
+        {
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch organization info: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.code !== 0) {
+        throw new Error(`Zoho API error: ${data.message}`);
+      }
+
+      return data.organization;
+    } catch (error) {
+      console.error('Error fetching organization info:', error);
+      throw new Error('Failed to fetch organization info from Zoho');
+    }
+  }
+}
+
+// Create singleton instance
+let zohoAPIInstance: ZohoAPI | null = null;
+
+export function getZohoAPI(): ZohoAPI {
+  if (!zohoAPIInstance) {
+    const clientId = process.env.ZOHO_CLIENT_ID;
+    const clientSecret = process.env.ZOHO_CLIENT_SECRET;
+    const refreshToken = process.env.ZOHO_REFRESH_TOKEN;
+    const organizationId = process.env.ZOHO_ORGANIZATION_ID;
+
+    if (!clientId || !clientSecret || !refreshToken || !organizationId) {
+      throw new Error('Zoho API credentials not configured');
+    }
+
+    zohoAPIInstance = new ZohoAPI(
+      clientId,
+      clientSecret,
+      refreshToken,
+      organizationId
+    );
+  }
+
+  return zohoAPIInstance;
+}
+
+export { ZohoAPI };
+export type { ZohoSalesOrder, ZohoLineItem, ZohoInvoiceResponse };

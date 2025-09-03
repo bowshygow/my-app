@@ -1,0 +1,186 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Supabase/Postgres connection
+  directUrl = env("DIRECT_URL") // Direct connection for migrations
+}
+
+//
+// 👤 Users - basic authentication for employees
+//
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String   // hashed password
+  createdAt DateTime @default(now())
+
+  // Relations
+  salesOrders SalesOrder[] @relation("UserSalesOrders")
+  factories   Factory[]     @relation("UserFactories")
+  uads        UAD[]         @relation("UserUADs")
+  invoices    Invoice[]     @relation("UserInvoices")
+}
+
+//
+// 📑 Sales Order - root record (fetched from Zoho Books)
+//
+model SalesOrder {
+  id           String   @id @default(cuid())
+  soNumber     String   @unique
+  zohoSoId     String   // Zoho Books salesorder_id
+  customerId   String   // Zoho Books customer_id
+  customerName String
+  startDate    DateTime
+  endDate      DateTime
+  billingCycle String   // "monthly" | "quarterly" | "halfyearly" | "yearly"
+  billingDay   Int?     // only for monthly
+  currencyCode String   @default("INR")
+  createdAt    DateTime @default(now())
+
+  // Relations
+  createdBy   String
+  user        User @relation("UserSalesOrders", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  lineItems   SOProduct[]
+  factories   Factory[]
+  uads        UAD[]
+  invoices    Invoice[]
+}
+
+//
+// 🛒 SO Products - line items inside a Sales Order
+//
+model SOProduct {
+  id         String   @id @default(cuid())
+  zohoItemId String   // Zoho Books item_id
+  name       String
+  qtySo      Int
+  rate       Float
+  currency   String   @default("INR")
+
+  soId       String
+  salesOrder SalesOrder @relation(fields: [soId], references: [id], onDelete: Cascade)
+}
+
+//
+// 🏭 Factory - allocations per SO
+//
+model Factory {
+  id        String   @id @default(cuid())
+  name      String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  soId      String
+  salesOrder SalesOrder @relation(fields: [soId], references: [id], onDelete: Cascade)
+
+  createdBy String
+  user      User @relation("UserFactories", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  allocations FactoryAllocation[]
+  uads        UAD[]
+  invoices    Invoice[]
+}
+
+//
+// 📦 Factory Allocations - subset of SO products
+//
+model FactoryAllocation {
+  id          String   @id @default(cuid())
+  zohoItemId  String   // match Zoho's item_id
+  productName String
+  qtyFactory  Int
+  rate        Float
+
+  factoryId   String
+  factory     Factory @relation(fields: [factoryId], references: [id], onDelete: Cascade)
+}
+
+//
+// 📄 UAD - user acceptance docs
+//
+model UAD {
+  id        String   @id @default(cuid())
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("Draft") // Draft | Active | Ended
+  notes     String?
+
+  soId      String
+  salesOrder SalesOrder @relation(fields: [soId], references: [id], onDelete: Cascade)
+
+  factoryId String?
+  factory   Factory? @relation(fields: [factoryId], references: [id], onDelete: SetNull)
+
+  createdBy String
+  user      User @relation("UserUADs", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  lineItems UADLineItem[]
+  invoices  Invoice[]
+}
+
+//
+// 📦 UAD Line Items - subset of Factory allocations
+//
+model UADLineItem {
+  id          String   @id @default(cuid())
+  zohoItemId  String   // Zoho Books item_id
+  productName String
+  qtyUad      Int
+  rate        Float
+
+  uadId       String
+  uad         UAD @relation(fields: [uadId], references: [id], onDelete: Cascade)
+}
+
+//
+// 💰 Invoice - generated per UAD per cycle
+//
+model Invoice {
+  id        String   @id @default(cuid())
+  externalInvoiceId String?   // Zoho Books invoice_id
+  externalInvoiceNumber String? // e.g., "INV-000227"
+  invoiceUrl String? // deep link to Zoho invoice
+  invoiceDate DateTime
+  cycleStart  DateTime
+  cycleEnd    DateTime
+  prorated    Boolean
+  amount      Float
+  breakdown   Json?   // proration details
+  customFields Json?  // store Factory/UAD identifiers
+
+  soId      String
+  salesOrder SalesOrder @relation(fields: [soId], references: [id], onDelete: Cascade)
+
+  factoryId String?
+  factory   Factory? @relation(fields: [factoryId], references: [id], onDelete: SetNull)
+
+  uadId     String
+  uad       UAD @relation(fields: [uadId], references: [id], onDelete: Cascade)
+
+  createdBy String
+  user      User @relation("UserInvoices", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  lineItems InvoiceLineItem[]
+}
+
+//
+// 📊 Invoice Line Items - detailed quantities and rates
+//
+model InvoiceLineItem {
+  id        String   @id @default(cuid())
+  zohoItemId String   // Zoho Books item_id
+  productName String
+  qty       Float     // may be fractional (prorated)
+  rate      Float
+  lineAmount Float
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
