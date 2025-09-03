@@ -44,7 +44,7 @@ async function handler(request: NextRequest) {
         lineItems: true,
       },
       orderBy: {
-        createdAt: 'desc',
+        invoiceDate: 'desc',
       },
     });
 

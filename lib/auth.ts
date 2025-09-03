@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from './prisma';
-import { comparePassword } from './utils';
+import { comparePassword, hashPassword } from './utils';
 
 export interface JWTPayload {
   userId: string;
@@ -128,8 +128,7 @@ export async function createUser(email: string, password: string, name?: string)
     }
 
     // Hash password
-    const bcrypt = require('bcryptjs');
-    const hashedPassword = bcrypt.hashSync(password, 10);
+    const hashedPassword = hashPassword(password);
 
     // Create user
     const user = await prisma.user.create({

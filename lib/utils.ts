@@ -162,17 +162,17 @@ export function isValidEmail(email: string): boolean {
 }
 
 /**
- * Hash password (placeholder - use bcrypt in production)
+ * Hash password using bcrypt
  */
 export function hashPassword(password: string): string {
-  // In production, use: return bcrypt.hashSync(password, 10);
-  return btoa(password); // Simple base64 encoding for demo
+  const bcrypt = require('bcryptjs');
+  return bcrypt.hashSync(password, 10);
 }
 
 /**
- * Compare password (placeholder - use bcrypt in production)
+ * Compare password using bcrypt
  */
 export function comparePassword(password: string, hashedPassword: string): boolean {
-  // In production, use: return bcrypt.compareSync(password, hashedPassword);
-  return btoa(password) === hashedPassword;
+  const bcrypt = require('bcryptjs');
+  return bcrypt.compareSync(password, hashedPassword);
 }

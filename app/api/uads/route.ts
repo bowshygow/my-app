@@ -121,7 +121,7 @@ async function getUADsHandler(request: NextRequest) {
         invoices: true,
       },
       orderBy: {
-        createdAt: 'desc',
+        startDate: 'desc',
       },
     });
 
@@ -150,7 +150,7 @@ async function generateInvoicesForUAD(
   salesOrder: any,
   userId: string
 ): Promise<any[]> {
-  const invoices = [];
+  const invoices: any[] = [];
   const uad = await prisma.uAD.findUnique({
     where: { id: uadId },
     include: { lineItems: true },
@@ -197,7 +197,7 @@ async function generateInvoicesForUAD(
             invoiceDate: new Date(),
             cycleStart: cycleDates.start,
             cycleEnd: cycleDates.end,
-            prorated: totalAmount !== (uad.lineItems.reduce((sum, item) => sum + (item.qtyUad * item.rate), 0)),
+            prorated: totalAmount !== (uad.lineItems.reduce((sum: number, item: any) => sum + (item.qtyUad * item.rate), 0)),
             amount: totalAmount,
             breakdown,
             customFields: {
