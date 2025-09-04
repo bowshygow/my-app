@@ -2,102 +2,87 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
 
 interface SalesOrder {
   id: string;
   soNumber: string;
+  zohoSoId: string;
+  customerId: string;
   customerName: string;
   startDate: string;
   endDate: string;
   billingCycle: string;
-  billingDay: number;
+  billingDay?: number;
   currencyCode: string;
+  createdAt: string;
   lineItems: Array<{
     id: string;
     zohoItemId: string;
     name: string;
     qtySo: number;
     rate: number;
+    currency: string;
   }>;
-}
-
-interface Factory {
-  id: string;
-  name: string;
-  notes?: string;
-  allocations: Array<{
-    id: string;
-    zohoItemId: string;
-    productName: string;
-    qtyFactory: number;
-    rate: number;
-  }>;
-}
-
-interface UAD {
-  id: string;
-  startDate: string;
-  endDate: string;
-  status: string;
-  notes?: string;
-  factory?: {
+  factories: Array<{
     id: string;
     name: string;
-  };
-  invoices: Array<{
-    id: string;
-    invoiceDate: string;
-    cycleStart: string;
-    cycleEnd: string;
-    amount: number;
-    prorated: boolean;
-    breakdown: any[];
+    notes?: string;
+    allocations: Array<{
+      id: string;
+      zohoItemId: string;
+      productName: string;
+      qtyFactory: number;
+      rate: number;
+    }>;
   }>;
-}
-
-interface Invoice {
-  id: string;
-  invoiceDate: string;
-  cycleStart: string;
-  cycleEnd: string;
-  amount: number;
-  prorated: boolean;
-  breakdown: any[];
-  factory?: {
-    id: string;
-    name: string;
-  };
-  uad: {
+  uads: Array<{
     id: string;
     startDate: string;
     endDate: string;
-  };
+    status: string;
+    notes?: string;
+    factory?: {
+      id: string;
+      name: string;
+    };
+    lineItems: Array<{
+      id: string;
+      zohoItemId: string;
+      productName: string;
+      qtyUad: number;
+      rate: number;
+    }>;
+  }>;
+  invoices: Array<{
+    id: string;
+    externalInvoiceNumber?: string;
+    invoiceDate: string;
+    cycleStart: string;
+    cycleEnd: string;
+    prorated: boolean;
+    amount: number;
+    factory?: {
+      id: string;
+      name: string;
+    };
+    uad: {
+      id: string;
+      startDate: string;
+      endDate: string;
+    };
+  }>;
 }
 
-type TabType = 'factories' | 'uads' | 'invoices';
-
-export default function SalesOrderDetailPage() {
-  const params = useParams();
-  const salesOrderId = params.id as string;
-  
-  const [activeTab, setActiveTab] = useState<TabType>('factories');
+export default function SalesOrderDetailPage({ params }: { params: { id: string } }) {
   const [salesOrder, setSalesOrder] = useState<SalesOrder | null>(null);
-  const [factories, setFactories] = useState<Factory[]>([]);
-  const [uads, setUads] = useState<UAD[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddFactoryModal, setShowAddFactoryModal] = useState(false);
-  const [showAddUADModal, setShowAddUADModal] = useState(false);
-  const [expandedInvoiceRows, setExpandedInvoiceRows] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (salesOrderId) {
-      fetchSalesOrderData();
-    }
-  }, [salesOrderId]);
+    fetchSalesOrder();
+  }, [params.id]);
 
-  const fetchSalesOrderData = async () => {
+  const fetchSalesOrder = async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -105,61 +90,28 @@ export default function SalesOrderDetailPage() {
         return;
       }
 
-      // Fetch sales order details
-      const soResponse = await fetch(`/api/salesorders/${salesOrderId}`, {
+      console.log('Fetching sales order with ID:', params.id);
+      const response = await fetch(`/api/salesorders/${params.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (soResponse.ok) {
-        const soData = await soResponse.json();
-        setSalesOrder(soData.salesOrder);
+      console.log('Response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Sales order data:', data);
+        setSalesOrder(data.salesOrder);
+      } else {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        setError(errorData.error || 'Failed to fetch sales order details');
       }
-
-      // Fetch factories for this sales order
-      const factoriesResponse = await fetch(`/api/factories?salesOrderId=${salesOrderId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (factoriesResponse.ok) {
-        const factoriesData = await factoriesResponse.json();
-        setFactories(factoriesData.factories || []);
-      }
-
-      // Fetch UADs for this sales order
-      const uadsResponse = await fetch(`/api/uads?salesOrderId=${salesOrderId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (uadsResponse.ok) {
-        const uadsData = await uadsResponse.json();
-        setUads(uadsData.uads || []);
-      }
-
-      // Fetch invoices for this sales order
-      const invoicesResponse = await fetch(`/api/invoices?salesOrderId=${salesOrderId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (invoicesResponse.ok) {
-        const invoicesData = await invoicesResponse.json();
-        setInvoices(invoicesData.invoices || []);
-      }
-
     } catch (error) {
-      console.error('Error fetching sales order data:', error);
+      console.error('Error fetching sales order:', error);
+      setError('Failed to fetch sales order details');
     } finally {
       setLoading(false);
     }
-  };
-
-  const toggleInvoiceRow = (invoiceId: string) => {
-    const newExpandedRows = new Set(expandedInvoiceRows);
-    if (newExpandedRows.has(invoiceId)) {
-      newExpandedRows.delete(invoiceId);
-    } else {
-      newExpandedRows.add(invoiceId);
-    }
-    setExpandedInvoiceRows(newExpandedRows);
   };
 
   const formatDate = (dateString: string) => {
@@ -170,13 +122,41 @@ export default function SalesOrderDetailPage() {
     });
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency: string = 'INR') => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'INR',
+      currency: currency,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(amount);
+  };
+
+  const getBillingCycleDisplay = (cycle: string, billingDay?: number) => {
+    switch (cycle.toLowerCase()) {
+      case 'monthly':
+        return `Monthly (Day ${billingDay || 'N/A'})`;
+      case 'quarterly':
+        return 'Quarterly (Mar 31, Jun 30, Sep 30, Dec 31)';
+      case 'halfyearly':
+        return 'Half-Yearly (Jun 30, Dec 31)';
+      case 'yearly':
+        return 'Yearly (12 months rolling)';
+      default:
+        return cycle;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'draft':
+        return 'bg-gray-100 text-gray-800';
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'ended':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   if (loading) {
@@ -184,20 +164,24 @@ export default function SalesOrderDetailPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading sales order...</p>
+          <p className="mt-4 text-gray-600">Loading sales order details...</p>
         </div>
       </div>
     );
   }
 
-  if (!salesOrder) {
+  if (error || !salesOrder) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-600 text-6xl mb-4">⚠️</div>
-          <p className="text-xl text-gray-900 mb-2">Sales Order Not Found</p>
-          <Link href="/dashboard" className="text-blue-600 hover:text-blue-800">
-            ← Back to Dashboard
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Sales Order Not Found</h1>
+          <p className="text-gray-600 mb-4">{error || 'The requested sales order could not be found.'}</p>
+          <Link
+            href="/dashboard"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+          >
+            Back to Dashboard
           </Link>
         </div>
       </div>
@@ -217,9 +201,19 @@ export default function SalesOrderDetailPage() {
               >
                 ← Back to Dashboard
               </Link>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Sales Order: {salesOrder.soNumber}
-              </h1>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  Sales Order: {salesOrder.soNumber}
+                </h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  {salesOrder.customerName} • Created {formatDate(salesOrder.createdAt)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">
+                {salesOrder.billingCycle}
+              </span>
             </div>
           </div>
         </div>
@@ -227,471 +221,369 @@ export default function SalesOrderDetailPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Sales Order Header Card */}
+        {/* Sales Order Overview */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Sales Order Details</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
-              <p className="text-sm text-gray-600">Customer</p>
-              <p className="text-lg font-semibold text-gray-900">{salesOrder.customerName}</p>
+              <p className="text-sm font-medium text-gray-600">Customer</p>
+              <p className="text-lg text-gray-900">{salesOrder.customerName}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Start Date</p>
-              <p className="text-lg font-semibold text-gray-900">{formatDate(salesOrder.startDate)}</p>
+              <p className="text-sm font-medium text-gray-600">Zoho SO ID</p>
+              <p className="text-lg text-gray-900">{salesOrder.zohoSoId}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">End Date</p>
-              <p className="text-lg font-semibold text-gray-900">{formatDate(salesOrder.endDate)}</p>
+              <p className="text-sm font-medium text-gray-600">Billing Cycle</p>
+              <p className="text-lg text-gray-900">{getBillingCycleDisplay(salesOrder.billingCycle, salesOrder.billingDay)}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Billing Cycle</p>
-              <p className="text-lg font-semibold text-gray-900 capitalize">{salesOrder.billingCycle}</p>
+              <p className="text-sm font-medium text-gray-600">Start Date</p>
+              <p className="text-lg text-gray-900">{formatDate(salesOrder.startDate)}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Billing Day</p>
-              <p className="text-lg font-semibold text-gray-900">{salesOrder.billingDay}</p>
+              <p className="text-sm font-medium text-gray-600">End Date</p>
+              <p className="text-lg text-gray-900">{formatDate(salesOrder.endDate)}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Currency</p>
-              <p className="text-lg font-semibold text-gray-900">{salesOrder.currencyCode}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Line Items</p>
-              <p className="text-lg font-semibold text-gray-900">{salesOrder.lineItems.length}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Value</p>
-              <p className="text-lg font-semibold text-gray-900">
-                {formatCurrency(salesOrder.lineItems.reduce((sum, item) => sum + (item.qtySo * item.rate), 0))}
-              </p>
+              <p className="text-sm font-medium text-gray-600">Currency</p>
+              <p className="text-lg text-gray-900">{salesOrder.currencyCode}</p>
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm border">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 px-6">
-              <button
-                onClick={() => setActiveTab('factories')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'factories'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Factories ({factories.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('uads')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'uads'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                UADs ({uads.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('invoices')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'invoices'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Invoices ({invoices.length})
-              </button>
-            </nav>
+        {/* Sales Order Line Items */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Line Items</h2>
+            <span className="text-sm text-gray-500">
+              {salesOrder.lineItems.length} product{salesOrder.lineItems.length !== 1 ? 's' : ''}
+            </span>
           </div>
-
-          <div className="p-6">
-            {/* Factories Tab */}
-            {activeTab === 'factories' && (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">Factories</h3>
-                  <button
-                    onClick={() => setShowAddFactoryModal(true)}
-                    className="px-4 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    + Add Factory
-                  </button>
+          
+          {/* Debug info - remove in production */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
+              <strong>Debug:</strong> Line items count: {salesOrder.lineItems.length}
+              {salesOrder.lineItems.length > 0 && (
+                <div className="mt-1">
+                  First item: {JSON.stringify(salesOrder.lineItems[0], null, 2)}
                 </div>
+              )}
+            </div>
+          )}
+          
+          {!salesOrder.lineItems || salesOrder.lineItems.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>No line items found</p>
+              <p className="text-sm mt-2">Line items will appear here when the sales order is fetched from Zoho Books</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Product
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Zoho Item ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Quantity (SO)
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Rate per Unit/Month
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Monthly Value
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Currency
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {salesOrder.lineItems.map((item, index) => (
+                    <tr key={item.id || index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{item.name || 'N/A'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{item.zohoItemId || 'N/A'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{(item.qtySo || 0).toLocaleString()}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{formatCurrency(item.rate || 0, item.currency || 'INR')}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatCurrency((item.qtySo || 0) * (item.rate || 0), item.currency || 'INR')}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{item.currency || 'INR'}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
-                {factories.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No factories created yet</p>
-                    <p className="text-sm mt-1">Create a factory to allocate products</p>
+        {/* Factories */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Factories</h2>
+            <span className="text-sm text-gray-500">
+              {salesOrder.factories.length} factor{salesOrder.factories.length !== 1 ? 'ies' : 'y'}
+            </span>
+          </div>
+          
+          {salesOrder.factories.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>No factories allocated yet</p>
+              <Link
+                href="/factories/new"
+                className="mt-2 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
+              >
+                + Add Factory
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {salesOrder.factories.map((factory) => (
+                <div key={factory.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900">{factory.name}</h3>
+                      {factory.notes && (
+                        <p className="text-sm text-gray-600 mt-1">{factory.notes}</p>
+                      )}
+                    </div>
+                    <span className="text-sm text-gray-500">
+                      {factory.allocations.length} allocation{factory.allocations.length !== 1 ? 's' : ''}
+                    </span>
                   </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Factory Name
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Notes
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Allocations
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {factories.map((factory) => (
-                          <tr key={factory.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {factory.name}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {factory.notes || '-'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {factory.allocations.length} products
-                            </td>
+                  
+                  {factory.allocations.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Product
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Qty Factory
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Rate
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Monthly Value
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* UADs Tab */}
-            {activeTab === 'uads' && (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">User Acceptance Documents</h3>
-                  <button
-                    onClick={() => setShowAddUADModal(true)}
-                    className="px-4 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    + Add UAD
-                  </button>
-                </div>
-
-                {uads.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No UADs created yet</p>
-                    <p className="text-sm mt-1">Create a UAD to track user acceptance</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            UAD ID
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Factory
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Start Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            End Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Invoices
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {uads.map((uad) => (
-                          <tr key={uad.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {uad.id.slice(-8)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {uad.factory ? uad.factory.name : 'N/A'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {formatDate(uad.startDate)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {formatDate(uad.endDate)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                uad.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {uad.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {uad.invoices.length}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Invoices Tab */}
-            {activeTab === 'invoices' && (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-6">Generated Invoices</h3>
-
-                {invoices.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No invoices generated yet</p>
-                    <p className="text-sm mt-1">Invoices are created automatically when UADs are saved</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Invoice No
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Cycle Start-End
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Amount
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Prorated
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Factory
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            UAD
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {invoices.map((invoice) => (
-                          <>
-                            <tr key={invoice.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {invoice.id.slice(-8)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {formatDate(invoice.invoiceDate)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {formatDate(invoice.cycleStart)} - {formatDate(invoice.cycleEnd)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {formatCurrency(invoice.amount)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                  invoice.prorated 
-                                    ? 'bg-blue-100 text-blue-800' 
-                                    : 'bg-green-100 text-green-800'
-                                }`}>
-                                  {invoice.prorated ? 'Yes' : 'No'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {invoice.factory ? invoice.factory.name : 'N/A'}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {formatDate(invoice.uad.startDate)} - {formatDate(invoice.uad.endDate)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button 
-                                  className="text-blue-600 hover:text-blue-900 mr-3"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleInvoiceRow(invoice.id);
-                                  }}
-                                >
-                                  {expandedInvoiceRows.has(invoice.id) ? 'Hide' : 'View'} Details
-                                </button>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {factory.allocations.map((allocation) => (
+                            <tr key={allocation.id}>
+                              <td className="px-4 py-2 text-sm text-gray-900">{allocation.productName}</td>
+                              <td className="px-4 py-2 text-sm text-gray-900">{allocation.qtyFactory.toLocaleString()}</td>
+                              <td className="px-4 py-2 text-sm text-gray-900">{formatCurrency(allocation.rate)}</td>
+                              <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                                {formatCurrency(allocation.qtyFactory * allocation.rate)}
                               </td>
                             </tr>
-                            
-                            {/* Expandable Breakdown Row */}
-                            {expandedInvoiceRows.has(invoice.id) && (
-                              <tr>
-                                <td colSpan={8} className="px-6 py-4 bg-gray-50">
-                                  <div className="space-y-4">
-                                    <div>
-                                      <h4 className="text-sm font-medium text-gray-900 mb-2">
-                                        Invoice Breakdown
-                                      </h4>
-                                      <div className="bg-white border border-gray-200 rounded-lg p-4">
-                                        <div className="mb-4">
-                                          <p className="text-sm text-gray-600 mb-2">Proration Details:</p>
-                                          <div className="bg-gray-100 rounded p-3">
-                                            <pre className="text-xs text-gray-800 overflow-x-auto">
-                                              {JSON.stringify(invoice.breakdown, null, 2)}
-                                            </pre>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Footer Summary */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mt-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Summary Report</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-blue-600">{factories.length}</p>
-              <p className="text-sm text-gray-600">Factories</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-purple-600">{uads.length}</p>
-              <p className="text-sm text-gray-600">UADs</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-orange-600">{invoices.length}</p>
-              <p className="text-sm text-gray-600">Invoices</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(invoices.reduce((sum, inv) => sum + inv.amount, 0))}
-              </p>
-              <p className="text-sm text-gray-600">Total Billed</p>
-            </div>
+        {/* UADs */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">User Acceptance Documents (UADs)</h2>
+            <span className="text-sm text-gray-500">
+              {salesOrder.uads.length} UAD{salesOrder.uads.length !== 1 ? 's' : ''}
+            </span>
           </div>
+          
+          {salesOrder.uads.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>No UADs created yet</p>
+              <Link
+                href="/uads/new"
+                className="mt-2 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200"
+              >
+                + Create UAD
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {salesOrder.uads.map((uad) => (
+                <div key={uad.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <div className="flex items-center space-x-3">
+                        <h3 className="text-lg font-medium text-gray-900">
+                          UAD: {formatDate(uad.startDate)} - {formatDate(uad.endDate)}
+                        </h3>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(uad.status)}`}>
+                          {uad.status}
+                        </span>
+                      </div>
+                      {uad.factory && (
+                        <p className="text-sm text-gray-600 mt-1">Factory: {uad.factory.name}</p>
+                      )}
+                      {uad.notes && (
+                        <p className="text-sm text-gray-600 mt-1">{uad.notes}</p>
+                      )}
+                    </div>
+                    <span className="text-sm text-gray-500">
+                      {uad.lineItems.length} line item{uad.lineItems.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  
+                  {uad.lineItems.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Product
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Qty UAD
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Rate
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Monthly Value
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {uad.lineItems.map((lineItem) => (
+                            <tr key={lineItem.id}>
+                              <td className="px-4 py-2 text-sm text-gray-900">{lineItem.productName}</td>
+                              <td className="px-4 py-2 text-sm text-gray-900">{lineItem.qtyUad.toLocaleString()}</td>
+                              <td className="px-4 py-2 text-sm text-gray-900">{formatCurrency(lineItem.rate)}</td>
+                              <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                                {formatCurrency(lineItem.qtyUad * lineItem.rate)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Invoices */}
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Generated Invoices</h2>
+            <span className="text-sm text-gray-500">
+              {salesOrder.invoices.length} invoice{salesOrder.invoices.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          
+          {salesOrder.invoices.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>No invoices generated yet</p>
+              <p className="text-sm mt-2">Invoices are generated automatically when UADs are created</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Invoice Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Cycle Period
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      UAD Period
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Factory
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Prorated
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      External Invoice
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {salesOrder.invoices.map((invoice) => (
+                    <tr key={invoice.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{formatDate(invoice.invoiceDate)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {formatDate(invoice.cycleStart)} - {formatDate(invoice.cycleEnd)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {formatDate(invoice.uad.startDate)} - {formatDate(invoice.uad.endDate)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {invoice.factory ? invoice.factory.name : 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatCurrency(invoice.amount)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          invoice.prorated 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {invoice.prorated ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {invoice.externalInvoiceNumber || 'Not synced'}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </main>
-
-      {/* Add Factory Modal */}
-      {showAddFactoryModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Add Factory</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Factory Name
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter factory name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Additional notes..."
-                  />
-                </div>
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => setShowAddFactoryModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700">
-                    Add Factory
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add UAD Modal */}
-      {showAddUADModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Add UAD</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Factory
-                  </label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 bg-white focus:outline-none focus:ring-purple-500 focus:border-purple-500">
-                    <option value="">Select a factory</option>
-                    {factories.map((factory) => (
-                      <option key={factory.id} value={factory.id}>
-                        {factory.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 bg-white focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 bg-white focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 bg-white focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                    placeholder="Additional notes..."
-                  />
-                </div>
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => setShowAddUADModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button className="px-4 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700">
-                    Add UAD
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-

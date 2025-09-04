@@ -29,13 +29,46 @@ async function handler(
 
     console.log('Fetching sales order:', id, 'for user:', user.userId);
 
-    // Fetch sales order with line items
+    // Fetch sales order with all related data
     const salesOrder = await prisma.salesOrder.findUnique({
       where: {
         id: id,
       },
       include: {
         lineItems: true,
+        factories: {
+          include: {
+            allocations: true,
+          },
+        },
+        uads: {
+          include: {
+            lineItems: true,
+            factory: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        invoices: {
+          include: {
+            factory: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            uad: {
+              select: {
+                id: true,
+                startDate: true,
+                endDate: true,
+              },
+            },
+          },
+        },
       },
     });
 
