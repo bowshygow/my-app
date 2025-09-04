@@ -1,0 +1,211 @@
+
+================================================================================
+UAD INVOICE GENERATION STARTED
+================================================================================
+
+[2025-09-04T12:42:31.807Z] INFO: Input Parameters
+{
+  "SO": {
+    "SOId": "cmf5cx7ds0002qlt0qsxfiob3",
+    "StartDate": "2024-05-01T00:00:00.000Z",
+    "EndDate": "2027-03-25T00:00:00.000Z",
+    "BillingCycle": "monthly ",
+    "BillingDay": 15,
+    "Rates": {
+      "2031676000000053573": 100
+    }
+  },
+  "UAD": {
+    "UADId": "cmf5ec0gt0001qlv0iuadgfqh",
+    "StartDate": "2025-05-15T00:00:00.000Z",
+    "EndDate": "2025-07-23T00:00:00.000Z",
+    "LineItems": [
+      {
+        "ProductId": "2031676000000053573",
+        "Qty": 10
+      }
+    ]
+  }
+}
+[2025-09-04T12:42:31.808Z] INFO: Sales Order Details
+{
+  "soId": "cmf5cx7ds0002qlt0qsxfiob3",
+  "soStartDate": "2024-05-01T00:00:00.000Z",
+  "soEndDate": "2027-03-25T00:00:00.000Z",
+  "billingCycle": "monthly ",
+  "billingDay": 15,
+  "currency": "INR"
+}
+[2025-09-04T12:42:31.808Z] INFO: UAD Details
+{
+  "uadId": "cmf5ec0gt0001qlv0iuadgfqh",
+  "uadStartDate": "2025-05-15T00:00:00.000Z",
+  "uadEndDate": "2025-07-23T00:00:00.000Z",
+  "factoryId": "cmf5cxobr0008qlt0f4oyhqwd",
+  "notes": "None"
+}
+[2025-09-04T12:42:31.808Z] INFO: Product Line Items
+[
+  {
+    "itemNumber": 1,
+    "productName": "Advisory Solutions",
+    "zohoItemId": "2031676000000053573",
+    "uadQuantity": 10,
+    "ratePerUnit": 100,
+    "totalValue": 1000
+  }
+]
+[2025-09-04T12:42:31.808Z] INFO: Total UAD Value
+{
+  "totalValue": 1000
+}
+
+================================================================================
+CYCLE GENERATION LOGIC
+================================================================================
+
+[2025-09-04T12:42:31.821Z] INFO: Date Analysis
+{
+  "soStart": "2024-05-01",
+  "soEnd": "2027-03-25",
+  "uadStart": "2025-05-15",
+  "uadEnd": "2025-07-23"
+}
+[2025-09-04T12:42:31.823Z] INFO: First Cycle End Calculation
+{
+  "uadStart": "2025-05-15",
+  "billingCycle": "monthly ",
+  "billingDay": 15,
+  "firstCycleEnd": "2025-06-14"
+}
+
+================================================================================
+CYCLE 1 ANALYSIS
+================================================================================
+
+[2025-09-04T12:42:31.824Z] INFO: Cycle 1 Details
+{
+  "cycleStart": "2024-05-01",
+  "cycleEnd": "2025-06-14",
+  "cycleDuration": 410
+}
+[2025-09-04T12:42:31.826Z] INFO: Overlap Calculation
+{
+  "maxCalculation": {
+    "cycleStart": "2024-05-01",
+    "uadStart": "2025-05-15",
+    "soStart": "2024-05-01",
+    "result": "2025-05-15"
+  },
+  "minCalculation": {
+    "cycleEnd": "2025-06-14",
+    "uadEnd": "2025-07-23",
+    "soEnd": "2027-03-25",
+    "result": "2025-06-14"
+  },
+  "overlapDuration": 31
+}
+[2025-09-04T12:42:31.827Z] INFO: Valid Overlap - Processing Cycle
+{
+  "status": "PROCESSING"
+}
+[2025-09-04T12:42:31.828Z] INFO: Full Cycle Check
+{
+  "overlapStartTime": 1747267200000,
+  "cycleStartTime": 1714521600000,
+  "overlapEndTime": 1749925800000,
+  "cycleEndTime": 1749925800000,
+  "startMatch": false,
+  "endMatch": true,
+  "isFullCycle": false
+}
+
+================================================================================
+CYCLE 2 ANALYSIS
+================================================================================
+
+[2025-09-04T12:42:32.250Z] INFO: Cycle 2 Details
+{
+  "cycleStart": "2025-07-15",
+  "cycleEnd": "2025-07-14",
+  "cycleDuration": 0
+}
+[2025-09-04T12:42:32.251Z] INFO: Overlap Calculation
+{
+  "maxCalculation": {
+    "cycleStart": "2025-07-15",
+    "uadStart": "2025-05-15",
+    "soStart": "2024-05-01",
+    "result": "2025-07-15"
+  },
+  "minCalculation": {
+    "cycleEnd": "2025-07-14",
+    "uadEnd": "2025-07-23",
+    "soEnd": "2027-03-25",
+    "result": "2025-07-14"
+  },
+  "overlapDuration": 0
+}
+[2025-09-04T12:42:32.251Z] INFO: Empty Overlap - Skipping Cycle
+{
+  "reason": "Overlap start (2025-07-15) > Overlap end (2025-07-14)",
+  "cycleStart": "2025-07-15",
+  "uadEnd": "2025-07-23",
+  "shouldTerminate": false
+}
+
+================================================================================
+CYCLE 3 ANALYSIS
+================================================================================
+
+[2025-09-04T12:42:32.252Z] INFO: Cycle 3 Details
+{
+  "cycleStart": "2025-08-15",
+  "cycleEnd": "2025-08-14",
+  "cycleDuration": 0
+}
+[2025-09-04T12:42:32.253Z] INFO: Overlap Calculation
+{
+  "maxCalculation": {
+    "cycleStart": "2025-08-15",
+    "uadStart": "2025-05-15",
+    "soStart": "2024-05-01",
+    "result": "2025-08-15"
+  },
+  "minCalculation": {
+    "cycleEnd": "2025-08-14",
+    "uadEnd": "2025-07-23",
+    "soEnd": "2027-03-25",
+    "result": "2025-07-23"
+  },
+  "overlapDuration": -22
+}
+[2025-09-04T12:42:32.253Z] INFO: Empty Overlap - Skipping Cycle
+{
+  "reason": "Overlap start (2025-08-15) > Overlap end (2025-07-23)",
+  "cycleStart": "2025-08-15",
+  "uadEnd": "2025-07-23",
+  "shouldTerminate": true
+}
+
+================================================================================
+FINAL SUMMARY
+================================================================================
+
+[2025-09-04T12:42:32.254Z] INFO: Invoice Generation Summary
+{
+  "totalCyclesProcessed": 2,
+  "totalInvoicesGenerated": 1,
+  "finalCumulativeUnits": 10.1613,
+  "finalCumulativeAmount": 1016.13,
+  "uadTotalValue": 1000,
+  "invoices": [
+    {
+      "id": "cmf5ec1160005qlv0ppj1r0t2",
+      "amount": 1016.13,
+      "prorated": true,
+      "cycleStart": "2024-05-01T00:00:00.000Z",
+      "cycleEnd": "2025-06-14T18:30:00.000Z"
+    }
+  ]
+}

@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next start"
+    "start": "next start",
+    "test:invoices": "node run-invoice-tests.js",
+    "test:calculations": "node test-invoice-calculations.js"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",

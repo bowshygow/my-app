@@ -67,6 +67,7 @@ async function handler(
                 endDate: true,
               },
             },
+            lineItems: true,
           },
         },
       },

@@ -61,6 +61,7 @@ interface SalesOrder {
     cycleEnd: string;
     prorated: boolean;
     amount: number;
+    breakdown?: any;
     factory?: {
       id: string;
       name: string;
@@ -70,6 +71,14 @@ interface SalesOrder {
       startDate: string;
       endDate: string;
     };
+    lineItems: Array<{
+      id: string;
+      zohoItemId: string;
+      productName: string;
+      qty: number;
+      rate: number;
+      lineAmount: number;
+    }>;
   }>;
 }
 
@@ -77,6 +86,7 @@ export default function SalesOrderDetailPage({ params }: { params: { id: string 
   const [salesOrder, setSalesOrder] = useState<SalesOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchSalesOrder();
@@ -157,6 +167,65 @@ export default function SalesOrderDetailPage({ params }: { params: { id: string 
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const generateUADName = (uad: any, index: number) => {
+    const startDate = formatDate(uad.startDate);
+    const endDate = formatDate(uad.endDate);
+    const factoryName = uad.factory ? ` - ${uad.factory.name}` : '';
+    return `UAD-${String(index + 1).padStart(2, '0')} (${startDate} to ${endDate})${factoryName}`;
+  };
+
+  const toggleInvoiceExpansion = (invoiceId: string) => {
+    const newExpanded = new Set(expandedInvoices);
+    if (newExpanded.has(invoiceId)) {
+      newExpanded.delete(invoiceId);
+    } else {
+      newExpanded.add(invoiceId);
+    }
+    setExpandedInvoices(newExpanded);
+  };
+
+  const calculateDaysInMonth = (year: number, month: number) => {
+    return new Date(year, month, 0).getDate();
+  };
+
+  const calculateProrationDetails = (invoice: any) => {
+    if (!invoice.prorated || !invoice.breakdown) {
+      return null;
+    }
+
+    const breakdown = invoice.breakdown;
+    const details: any[] = [];
+
+    // Parse breakdown if it's a string
+    let parsedBreakdown;
+    try {
+      parsedBreakdown = typeof breakdown === 'string' ? JSON.parse(breakdown) : breakdown;
+    } catch {
+      return null;
+    }
+
+    if (Array.isArray(parsedBreakdown)) {
+      parsedBreakdown.forEach((item: any) => {
+        if (item.months) {
+          item.months.forEach((month: any) => {
+            details.push({
+              product: item.productId || 'Unknown Product',
+              year: month.year,
+              month: month.month,
+              activeDays: month.activeDays,
+              daysInMonth: month.daysInMonth,
+              fraction: month.fraction,
+              amount: month.amount,
+              fullMonthAmount: item.fullMonthAmount || 0
+            });
+          });
+        }
+      });
+    }
+
+    return details;
   };
 
   if (loading) {
@@ -430,23 +499,26 @@ export default function SalesOrderDetailPage({ params }: { params: { id: string 
             </div>
           ) : (
             <div className="space-y-6">
-              {salesOrder.uads.map((uad) => (
+              {salesOrder.uads.map((uad, index) => (
                 <div key={uad.id} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <div className="flex items-center space-x-3">
                         <h3 className="text-lg font-medium text-gray-900">
-                          UAD: {formatDate(uad.startDate)} - {formatDate(uad.endDate)}
+                          {generateUADName(uad, index)}
                         </h3>
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(uad.status)}`}>
                           {uad.status}
                         </span>
                       </div>
-                      {uad.factory && (
-                        <p className="text-sm text-gray-600 mt-1">Factory: {uad.factory.name}</p>
-                      )}
+                      <div className="mt-1 text-sm text-gray-600">
+                        <span className="font-medium">Period:</span> {formatDate(uad.startDate)} - {formatDate(uad.endDate)}
+                        {uad.factory && (
+                          <span className="ml-4"><span className="font-medium">Factory:</span> {uad.factory.name}</span>
+                        )}
+                      </div>
                       {uad.notes && (
-                        <p className="text-sm text-gray-600 mt-1">{uad.notes}</p>
+                        <p className="text-sm text-gray-600 mt-1"><span className="font-medium">Notes:</span> {uad.notes}</p>
                       )}
                     </div>
                     <span className="text-sm text-gray-500">
@@ -538,45 +610,285 @@ export default function SalesOrderDetailPage({ params }: { params: { id: string 
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {salesOrder.invoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatDate(invoice.invoiceDate)}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatDate(invoice.cycleStart)} - {formatDate(invoice.cycleEnd)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatDate(invoice.uad.startDate)} - {formatDate(invoice.uad.endDate)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {invoice.factory ? invoice.factory.name : 'N/A'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {formatCurrency(invoice.amount)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          invoice.prorated 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : 'bg-green-100 text-green-800'
-                        }`}>
-                          {invoice.prorated ? 'Yes' : 'No'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {invoice.externalInvoiceNumber || 'Not synced'}
-                        </div>
-                      </td>
-                    </tr>
+                    <>
+                      <tr 
+                        key={invoice.id} 
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => toggleInvoiceExpansion(invoice.id)}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{formatDate(invoice.invoiceDate)}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {formatDate(invoice.cycleStart)} - {formatDate(invoice.cycleEnd)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {formatDate(invoice.uad.startDate)} - {formatDate(invoice.uad.endDate)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {invoice.factory ? invoice.factory.name : 'N/A'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatCurrency(invoice.amount)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            invoice.prorated 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {invoice.prorated ? 'Yes' : 'No'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {invoice.externalInvoiceNumber || 'Not synced'}
+                          </div>
+                        </td>
+                      </tr>
+                      
+                      {/* Expandable Calculation Details */}
+                      {expandedInvoices.has(invoice.id) && (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-4 bg-gray-50">
+                            <div className="space-y-4">
+                              <div className="flex justify-between items-center">
+                                <h4 className="text-sm font-medium text-gray-900">
+                                  Invoice Calculation Details
+                                </h4>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleInvoiceExpansion(invoice.id);
+                                  }}
+                                  className="text-sm text-gray-500 hover:text-gray-700"
+                                >
+                                  ✕ Close
+                                </button>
+                              </div>
+                              
+                              {/* Invoice Line Items */}
+                              {invoice.lineItems && invoice.lineItems.length > 0 && (
+                                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                  <h5 className="text-sm font-medium text-gray-900 mb-3">Line Items</h5>
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                      <thead className="bg-gray-50">
+                                        <tr>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Line Amount</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="bg-white divide-y divide-gray-200">
+                                        {invoice.lineItems.map((lineItem) => (
+                                          <tr key={lineItem.id}>
+                                            <td className="px-3 py-2 text-sm text-gray-900">{lineItem.productName}</td>
+                                            <td className="px-3 py-2 text-sm text-gray-900">{lineItem.qty.toLocaleString()}</td>
+                                            <td className="px-3 py-2 text-sm text-gray-900">{formatCurrency(lineItem.rate)}</td>
+                                            <td className="px-3 py-2 text-sm font-medium text-gray-900">{formatCurrency(lineItem.lineAmount)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Detailed Calculation Process */}
+                              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                <h5 className="text-sm font-medium text-gray-900 mb-3">📊 Detailed Calculation Process</h5>
+                                
+                                {/* Step 1: Billing Cycle Analysis */}
+                                <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
+                                  <h6 className="text-sm font-semibold text-gray-900 mb-2">Step 1: Billing Cycle Analysis</h6>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <span className="font-medium text-gray-700">Billing Cycle:</span>
+                                      <div className="text-gray-900">{getBillingCycleDisplay(salesOrder.billingCycle, salesOrder.billingDay)}</div>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-gray-700">Cycle Period:</span>
+                                      <div className="text-gray-900">{formatDate(invoice.cycleStart)} - {formatDate(invoice.cycleEnd)}</div>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-gray-700">UAD Period:</span>
+                                      <div className="text-gray-900">{formatDate(invoice.uad.startDate)} - {formatDate(invoice.uad.endDate)}</div>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-gray-700">Overlap Days:</span>
+                                      <div className="text-gray-900">{(() => {
+                                        const cycleStart = new Date(invoice.cycleStart);
+                                        const cycleEnd = new Date(invoice.cycleEnd);
+                                        const uadStart = new Date(invoice.uad.startDate);
+                                        const uadEnd = new Date(invoice.uad.endDate);
+                                        
+                                        const overlapStart = new Date(Math.max(cycleStart.getTime(), uadStart.getTime()));
+                                        const overlapEnd = new Date(Math.min(cycleEnd.getTime(), uadEnd.getTime()));
+                                        const overlapDays = Math.max(0, Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+                                        
+                                        return `${overlapDays} days`;
+                                      })()}</div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Step 2: Rate Calculations */}
+                                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                                  <h6 className="text-sm font-semibold text-blue-900 mb-2">Step 2: Rate Calculations</h6>
+                                  {invoice.lineItems && invoice.lineItems.map((lineItem, index) => (
+                                    <div key={index} className="mb-3 p-2 bg-white border border-blue-100 rounded">
+                                      <div className="text-sm">
+                                        <div className="font-medium text-blue-900 mb-1">{lineItem.productName}</div>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                          <div>
+                                            <span className="text-blue-700">UAD Qty:</span>
+                                            <div className="font-medium">{lineItem.qty.toLocaleString()}</div>
+                                          </div>
+                                          <div>
+                                            <span className="text-blue-700">Rate/Month:</span>
+                                            <div className="font-medium">{formatCurrency(lineItem.rate)}</div>
+                                          </div>
+                                          <div>
+                                            <span className="text-blue-700">Full Cycle Value:</span>
+                                            <div className="font-medium">{formatCurrency(lineItem.qty * lineItem.rate)}</div>
+                                          </div>
+                                          <div>
+                                            <span className="text-blue-700">Formula:</span>
+                                            <div className="font-mono text-xs">Qty × Rate</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Step 3: Proration Details */}
+                                {invoice.prorated && (
+                                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                                    <h6 className="text-sm font-semibold text-yellow-900 mb-2">Step 3: Proration Calculation</h6>
+                                    {(() => {
+                                      const prorationDetails = calculateProrationDetails(invoice);
+                                      if (prorationDetails && prorationDetails.length > 0) {
+                                        return (
+                                          <div className="space-y-3">
+                                            {prorationDetails.map((detail, index) => (
+                                              <div key={index} className="bg-white border border-yellow-100 rounded p-3">
+                                                <div className="text-sm font-medium text-yellow-900 mb-2">
+                                                  {detail.product} - {detail.month}/{detail.year}
+                                                </div>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                                  <div>
+                                                    <span className="text-yellow-700">Active Days:</span>
+                                                    <div className="font-medium">{detail.activeDays}/{detail.daysInMonth}</div>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-yellow-700">Fraction:</span>
+                                                    <div className="font-medium">{(detail.fraction * 100).toFixed(2)}%</div>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-yellow-700">Full Amount:</span>
+                                                    <div className="font-medium">{formatCurrency(detail.fullMonthAmount)}</div>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-yellow-700">Prorated:</span>
+                                                    <div className="font-medium">{formatCurrency(detail.amount)}</div>
+                                                  </div>
+                                                </div>
+                                                <div className="mt-2 pt-2 border-t border-yellow-200 text-xs">
+                                                  <div className="font-mono text-yellow-800">
+                                                    Formula: {formatCurrency(detail.fullMonthAmount)} × {detail.fraction.toFixed(4)} = {formatCurrency(detail.amount)}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        );
+                                      } else {
+                                        return (
+                                          <div className="text-sm text-yellow-800">
+                                            <p>Proration applied based on date overlap:</p>
+                                            <div className="mt-2 p-2 bg-white border border-yellow-100 rounded">
+                                              <div className="font-mono text-xs">
+                                                Proration Factor = Overlap Days ÷ Total Cycle Days
+                                              </div>
+                                              <div className="mt-1 font-mono text-xs">
+                                                Prorated Amount = Full Amount × Proration Factor
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+                                    })()}
+                                  </div>
+                                )}
+
+                                {/* Step 4: Final Calculation Summary */}
+                                <div className="p-3 bg-green-50 border border-green-200 rounded">
+                                  <h6 className="text-sm font-semibold text-green-900 mb-2">Step 4: Final Calculation Summary</h6>
+                                  <div className="space-y-2 text-sm">
+                                    {invoice.lineItems && invoice.lineItems.map((lineItem, index) => (
+                                      <div key={index} className="flex justify-between items-center p-2 bg-white border border-green-100 rounded">
+                                        <span className="text-green-800">{lineItem.productName}</span>
+                                        <span className="font-medium text-green-900">{formatCurrency(lineItem.lineAmount)}</span>
+                                      </div>
+                                    ))}
+                                    <div className="pt-2 border-t border-green-200">
+                                      <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-green-900">Total Invoice Amount:</span>
+                                        <span className="text-lg font-bold text-green-900">{formatCurrency(invoice.amount)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Full Cycle Details */}
+                              {!invoice.prorated && (
+                                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                  <h5 className="text-sm font-medium text-gray-900 mb-3">Full Cycle Calculation</h5>
+                                  <div className="text-sm text-gray-600">
+                                    <p>This invoice covers a complete billing cycle with no proration required.</p>
+                                    <div className="mt-2 grid grid-cols-2 gap-4">
+                                      <div>
+                                        <span className="font-medium">Cycle Period:</span>
+                                        <div>{formatDate(invoice.cycleStart)} - {formatDate(invoice.cycleEnd)}</div>
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">UAD Period:</span>
+                                        <div>{formatDate(invoice.uad.startDate)} - {formatDate(invoice.uad.endDate)}</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Summary */}
+                              <div className="bg-gray-100 border border-gray-200 rounded-lg p-4">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-medium text-gray-900">Total Invoice Amount:</span>
+                                  <span className="text-lg font-bold text-gray-900">{formatCurrency(invoice.amount)}</span>
+                                </div>
+                                {invoice.externalInvoiceNumber && (
+                                  <div className="mt-2 text-sm text-gray-600">
+                                    <span className="font-medium">External Invoice:</span> {invoice.externalInvoiceNumber}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>

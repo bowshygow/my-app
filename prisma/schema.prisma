@@ -40,6 +40,7 @@ model SalesOrder {
   endDate      DateTime
   billingCycle String   // "monthly" | "quarterly" | "halfyearly" | "yearly"
   billingDay   Int?     // only for monthly
+  billOnLastDay Boolean @default(false) // if true, cycles end on last day of month
   currencyCode String   @default("INR")
   createdAt    DateTime @default(now())
 
