@@ -277,10 +277,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Sales Orders */}
+        {/* All Sales Orders */}
         {salesOrders.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Sales Orders</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">All Sales Orders</h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -293,8 +293,12 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {salesOrders.slice(0, 5).map((so) => (
-                    <tr key={so.id} className="hover:bg-gray-50">
+                  {salesOrders.map((so) => (
+                    <tr 
+                      key={so.id} 
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => window.location.href = `/sales-orders/${so.id}`}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {so.soNumber}
                       </td>
@@ -315,16 +319,6 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
-            {salesOrders.length > 5 && (
-              <div className="mt-4 text-center">
-                <Link
-                  href="/sales-orders"
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                >
-                  View all {salesOrders.length} sales orders →
-                </Link>
-              </div>
-            )}
           </div>
         )}
 

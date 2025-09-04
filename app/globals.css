@@ -24,3 +24,18 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Ensure form inputs have proper text colors */
+input, textarea, select {
+  color: #111827 !important; /* text-gray-900 */
+}
+
+/* Override any browser default styles that might make text white */
+input::placeholder, textarea::placeholder {
+  color: #6b7280 !important; /* text-gray-500 */
+}
+
+/* Ensure focus states maintain text color */
+input:focus, textarea:focus, select:focus {
+  color: #111827 !important; /* text-gray-900 */
+}

@@ -13,13 +13,24 @@ async function handler(request: NextRequest) {
       );
     }
 
-    console.log('Fetching invoices for user:', user.userId);
+    // Check if we're filtering by sales order
+    const { searchParams } = new URL(request.url);
+    const salesOrderId = searchParams.get('salesOrderId');
 
-    // Fetch all invoices for the authenticated user
+    console.log('Fetching invoices for user:', user.userId, salesOrderId ? `for sales order: ${salesOrderId}` : '');
+
+    // Build where clause
+    const whereClause: any = {
+      createdBy: user.userId,
+    };
+
+    if (salesOrderId) {
+      whereClause.soId = salesOrderId;
+    }
+
+    // Fetch invoices for the authenticated user
     const invoices = await prisma.invoice.findMany({
-      where: {
-        createdBy: user.userId,
-      },
+      where: whereClause,
       include: {
         salesOrder: {
           select: {

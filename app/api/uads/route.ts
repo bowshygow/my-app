@@ -96,13 +96,24 @@ async function getUADsHandler(request: NextRequest) {
       );
     }
 
-    console.log('Fetching UADs for user:', user.userId);
+    // Check if we're filtering by sales order
+    const { searchParams } = new URL(request.url);
+    const salesOrderId = searchParams.get('salesOrderId');
 
-    // Fetch all UADs for the authenticated user
+    console.log('Fetching UADs for user:', user.userId, salesOrderId ? `for sales order: ${salesOrderId}` : '');
+
+    // Build where clause
+    const whereClause: any = {
+      createdBy: user.userId,
+    };
+
+    if (salesOrderId) {
+      whereClause.soId = salesOrderId;
+    }
+
+    // Fetch UADs for the authenticated user
     const uads = await prisma.uAD.findMany({
-      where: {
-        createdBy: user.userId,
-      },
+      where: whereClause,
       include: {
         salesOrder: {
           select: {
@@ -158,62 +169,69 @@ async function generateInvoicesForUAD(
 
   if (!uad) return invoices;
 
-  // Calculate billing cycles
+  // Calculate billing cycles based on the actual billing cycle type
   let cycleNumber = 0;
   let currentDate = new Date(salesOrder.startDate);
   const endDate = new Date(salesOrder.endDate);
+  
+  console.log(`=== INVOICE GENERATION START ===`);
+  console.log(`Sales Order Start Date: ${salesOrder.startDate}`);
+  console.log(`Sales Order End Date: ${salesOrder.endDate}`);
+  console.log(`UAD Start Date: ${uad.startDate}`);
+  console.log(`UAD End Date: ${uad.endDate}`);
+  console.log(`Billing Cycle: "${salesOrder.billingCycle}"`);
 
-  while (currentDate <= endDate) {
-    const cycleDates = calculateCycleDates(
-      new Date(salesOrder.startDate),
-      cycleNumber,
-      salesOrder.billingCycle as any,
-      salesOrder.billingDay
-    );
+  // Calculate how many cycles we need to generate
+  let maxCycles = 0;
+  const normalizedCycle = salesOrder.billingCycle.toLowerCase().replace('-', '').trim();
+  
+  switch (normalizedCycle) {
+    case 'monthly':
+      maxCycles = Math.ceil((endDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+      break;
+    case 'quarterly':
+      maxCycles = Math.ceil((endDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24 * 90));
+      break;
+    case 'halfyearly':
+      maxCycles = Math.ceil((endDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24 * 180));
+      break;
+    case 'yearly':
+      maxCycles = Math.ceil((endDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24 * 365));
+      break;
+    default:
+      maxCycles = 12; // fallback
+  }
+  
+  console.log(`Max cycles to generate: ${maxCycles}`);
 
-    // Check if UAD overlaps with this cycle
-    if (uad.startDate <= cycleDates.end && uad.endDate >= cycleDates.start) {
-      // Calculate invoice amount for this cycle
-      let totalAmount = 0;
-      const breakdown: any = {};
+  for (let cycleNumber = 0; cycleNumber < maxCycles; cycleNumber++) {
+    console.log(`=== GENERATING CYCLE ${cycleNumber} ===`);
+    
+    try {
+      const cycleDates = calculateCycleDates(
+        new Date(salesOrder.startDate),
+        cycleNumber,
+        salesOrder.billingCycle as any,
+        salesOrder.billingDay
+      );
+      
+      console.log(`Cycle ${cycleNumber} dates:`, {
+        start: cycleDates.start,
+        end: cycleDates.end
+      });
 
-      for (const lineItem of uad.lineItems) {
-        const fullAmount = lineItem.qtyUad * lineItem.rate;
-        const proration = calculateProratedAmount(
-          uad.startDate,
-          uad.endDate,
-          cycleDates.start,
-          cycleDates.end,
-          fullAmount
-        );
+      // Check if UAD overlaps with this cycle
+      if (uad.startDate <= cycleDates.end && uad.endDate >= cycleDates.start) {
+        console.log(`✅ UAD overlaps with cycle ${cycleNumber}`);
+        
+        // Calculate invoice amount for this cycle
+        let totalAmount = 0;
+        const breakdown: any[] = [];
 
-        totalAmount += proration.amount;
-        breakdown[lineItem.productName] = proration;
-      }
-
-      if (totalAmount > 0) {
-        const invoice = await prisma.invoice.create({
-          data: {
-            invoiceDate: new Date(),
-            cycleStart: cycleDates.start,
-            cycleEnd: cycleDates.end,
-            prorated: totalAmount !== (uad.lineItems.reduce((sum: number, item: any) => sum + (item.qtyUad * item.rate), 0)),
-            amount: totalAmount,
-            breakdown,
-            customFields: {
-              factory: uad.factoryId ? 'Factory ID: ' + uad.factoryId : null,
-              uad: uad.id,
-            },
-            soId: salesOrder.id,
-            factoryId: uad.factoryId,
-            uadId: uad.id,
-            createdBy: userId,
-          },
-        });
-
-        // Create invoice line items
         for (const lineItem of uad.lineItems) {
           const fullAmount = lineItem.qtyUad * lineItem.rate;
+          console.log(`Processing line item: ${lineItem.productName}, Full amount: ${fullAmount}`);
+          
           const proration = calculateProratedAmount(
             uad.startDate,
             uad.endDate,
@@ -221,26 +239,83 @@ async function generateInvoicesForUAD(
             cycleDates.end,
             fullAmount
           );
+          
+          console.log(`Proration result:`, proration);
 
-          await prisma.invoiceLineItem.create({
-            data: {
-              zohoItemId: lineItem.zohoItemId,
+          totalAmount += proration.amount;
+          if (proration.breakdown) {
+            breakdown.push({
               productName: lineItem.productName,
-              qty: proration.amount / lineItem.rate,
-              rate: lineItem.rate,
-              lineAmount: proration.amount,
-              invoiceId: invoice.id,
-            },
-          });
+              ...proration.breakdown
+            });
+          }
         }
 
-        invoices.push(invoice);
-      }
-    }
+        console.log(`Total amount for cycle ${cycleNumber}: ${totalAmount}`);
 
-    cycleNumber++;
-    currentDate = addMonths(currentDate, 1);
+        if (totalAmount > 0) {
+          console.log(`Creating invoice for cycle ${cycleNumber} with amount ${totalAmount}`);
+          
+          const invoice = await prisma.invoice.create({
+            data: {
+              invoiceDate: new Date(),
+              cycleStart: cycleDates.start,
+              cycleEnd: cycleDates.end,
+              prorated: totalAmount !== (uad.lineItems.reduce((sum: number, item: any) => sum + (item.qtyUad * item.rate), 0)),
+              amount: totalAmount,
+              breakdown,
+              customFields: {
+                factory: uad.factoryId ? 'Factory ID: ' + uad.factoryId : null,
+                uad: uad.id,
+              },
+              soId: salesOrder.id,
+              factoryId: uad.factoryId,
+              uadId: uad.id,
+              createdBy: userId,
+            },
+          });
+
+          console.log(`✅ Invoice created: ${invoice.id}`);
+
+          // Create invoice line items
+          for (const lineItem of uad.lineItems) {
+            const fullAmount = lineItem.qtyUad * lineItem.rate;
+            const proration = calculateProratedAmount(
+              uad.startDate,
+              uad.endDate,
+              cycleDates.start,
+              cycleDates.end,
+              fullAmount
+            );
+
+            await prisma.invoiceLineItem.create({
+              data: {
+                zohoItemId: lineItem.zohoItemId,
+                productName: lineItem.productName,
+                qty: proration.amount / lineItem.rate,
+                rate: lineItem.rate,
+                lineAmount: proration.amount,
+                invoiceId: invoice.id,
+              },
+            });
+          }
+
+          invoices.push(invoice);
+          console.log(`✅ Invoice line items created for invoice ${invoice.id}`);
+        } else {
+          console.log(`⚠️ No amount to invoice for cycle ${cycleNumber}`);
+        }
+      } else {
+        console.log(`❌ UAD does not overlap with cycle ${cycleNumber}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error generating cycle ${cycleNumber}:`, error);
+      // Continue with next cycle instead of failing completely
+    }
   }
+  
+  console.log(`=== INVOICE GENERATION COMPLETE ===`);
+  console.log(`Total invoices generated: ${invoices.length}`);
 
   return invoices;
 }

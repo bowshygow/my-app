@@ -5,58 +5,88 @@ import Link from 'next/link';
 
 interface Invoice {
   id: string;
-  externalInvoiceNumber: string;
+  externalInvoiceNumber?: string;
   invoiceDate: string;
   cycleStart: string;
   cycleEnd: string;
   amount: number;
-  status: string;
-  customerName: string;
+  prorated: boolean;
+  breakdown: any[];
+  salesOrder: {
+    id: string;
+    soNumber: string;
+    customerName: string;
+  };
+  factory?: {
+    id: string;
+    name: string;
+  };
+  uad: {
+    id: string;
+    startDate: string;
+    endDate: string;
+  };
 }
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // TODO: Fetch invoices from API
-    // For now, show demo data
-    setInvoices([
-      {
-        id: '1',
-        externalInvoiceNumber: 'INV-001',
-        invoiceDate: '2024-01-15',
-        cycleStart: '2024-01-01',
-        cycleEnd: '2024-01-31',
-        amount: 15000.00,
-        status: 'Paid',
-        customerName: 'Demo Customer 1'
-      },
-      {
-        id: '2',
-        externalInvoiceNumber: 'INV-002',
-        invoiceDate: '2024-02-15',
-        cycleStart: '2024-02-01',
-        cycleEnd: '2024-02-29',
-        amount: 18000.00,
-        status: 'Pending',
-        customerName: 'Demo Customer 2'
-      }
-    ]);
-    setLoading(false);
+    fetchInvoices();
   }, []);
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'overdue':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const fetchInvoices = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = '/auth/login';
+        return;
+      }
+
+      const response = await fetch('/api/invoices', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setInvoices(data.invoices || []);
+      } else {
+        console.error('Failed to fetch invoices');
+      }
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const toggleRow = (invoiceId: string) => {
+    const newExpandedRows = new Set(expandedRows);
+    if (newExpandedRows.has(invoiceId)) {
+      newExpandedRows.delete(invoiceId);
+    } else {
+      newExpandedRows.add(invoiceId);
+    }
+    setExpandedRows(newExpandedRows);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
   };
 
   if (loading) {
@@ -88,9 +118,9 @@ export default function InvoicesPage() {
               </h1>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                Generate Invoice
-              </button>
+              <span className="text-sm text-gray-500">
+                Invoices are generated automatically when UADs are saved
+              </span>
             </div>
           </div>
         </div>
@@ -112,11 +142,11 @@ export default function InvoicesPage() {
           
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="flex items-center">
-              <div className="text-green-600 text-2xl mr-4">✅</div>
+              <div className="text-blue-600 text-2xl mr-4">📊</div>
               <div>
-                <p className="text-sm font-medium text-gray-600">Paid</p>
+                <p className="text-sm font-medium text-gray-600">Prorated</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  {invoices.filter(inv => inv.status === 'Paid').length}
+                  {invoices.filter(inv => inv.prorated).length}
                 </p>
               </div>
             </div>
@@ -124,11 +154,11 @@ export default function InvoicesPage() {
           
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <div className="flex items-center">
-              <div className="text-yellow-600 text-2xl mr-4">⏳</div>
+              <div className="text-green-600 text-2xl mr-4">✅</div>
               <div>
-                <p className="text-sm font-medium text-gray-600">Pending</p>
+                <p className="text-sm font-medium text-gray-600">Full Cycle</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  {invoices.filter(inv => inv.status === 'Pending').length}
+                  {invoices.filter(inv => !inv.prorated).length}
                 </p>
               </div>
             </div>
@@ -140,7 +170,7 @@ export default function InvoicesPage() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Amount</p>
                 <p className="text-2xl font-semibold text-gray-900">
-                  ₹{invoices.reduce((sum, inv) => sum + inv.amount, 0).toLocaleString()}
+                  {formatCurrency(invoices.reduce((sum, inv) => sum + inv.amount, 0))}
                 </p>
               </div>
             </div>
@@ -150,13 +180,16 @@ export default function InvoicesPage() {
         {/* Invoices List */}
         <div className="bg-white rounded-lg shadow-sm border">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">All Invoices</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Generated Invoices</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Click on any row to view detailed breakdown
+            </p>
           </div>
           
           {invoices.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500">No invoices found</p>
-              <p className="text-sm text-gray-400 mt-2">Create a UAD to generate invoices</p>
+              <p className="text-sm text-gray-400 mt-2">Create a UAD to generate invoices automatically</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -164,22 +197,22 @@ export default function InvoicesPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Invoice
+                      Invoice Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Customer
+                      Cycle Start-End
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
+                      UAD
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Period
+                      Factory
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Amount
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      Prorated
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -188,42 +221,99 @@ export default function InvoicesPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {invoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {invoice.externalInvoiceNumber}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{invoice.customerName}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{invoice.invoiceDate}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {invoice.cycleStart} - {invoice.cycleEnd}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          ₹{invoice.amount.toLocaleString()}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
-                          {invoice.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button className="text-orange-600 hover:text-orange-900 mr-3">
-                          View
-                        </button>
-                        <button className="text-blue-600 hover:text-blue-900">
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
+                    <>
+                      <tr 
+                        key={invoice.id} 
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => toggleRow(invoice.id)}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatDate(invoice.invoiceDate)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {formatDate(invoice.cycleStart)} - {formatDate(invoice.cycleEnd)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {formatDate(invoice.uad.startDate)} - {formatDate(invoice.uad.endDate)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {invoice.factory ? invoice.factory.name : 'N/A'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatCurrency(invoice.amount)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            invoice.prorated 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {invoice.prorated ? 'Yes' : 'No'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button 
+                            className="text-orange-600 hover:text-orange-900"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleRow(invoice.id);
+                            }}
+                          >
+                            {expandedRows.has(invoice.id) ? 'Hide' : 'View'} Details
+                          </button>
+                        </td>
+                      </tr>
+                      
+                      {/* Expandable Breakdown Row */}
+                      {expandedRows.has(invoice.id) && (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-4 bg-gray-50">
+                            <div className="space-y-4">
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-900 mb-2">
+                                  Invoice Breakdown
+                                </h4>
+                                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                      <p className="text-sm text-gray-600">Sales Order</p>
+                                      <p className="text-sm font-medium text-gray-900">
+                                        {invoice.salesOrder.soNumber} - {invoice.salesOrder.customerName}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-sm text-gray-600">Total Amount</p>
+                                      <p className="text-sm font-medium text-gray-900">
+                                        {formatCurrency(invoice.amount)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div>
+                                    <p className="text-sm text-gray-600 mb-2">Proration Details:</p>
+                                    <div className="bg-gray-100 rounded p-3">
+                                      <pre className="text-xs text-gray-800 overflow-x-auto">
+                                        {JSON.stringify(invoice.breakdown, null, 2)}
+                                      </pre>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))}
                 </tbody>
               </table>

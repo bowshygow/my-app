@@ -20,7 +20,13 @@ export function calculateCycleDates(
   let cycleStart: Date;
   let cycleEnd: Date;
 
-  switch (billingCycle) {
+  // Normalize billing cycle to handle Zoho API variations
+  const normalizedCycle = billingCycle.toLowerCase().replace('-', '').trim();
+  
+  // Log for debugging
+  console.log(`Billing cycle normalization: "${billingCycle}" -> "${normalizedCycle}"`);
+
+  switch (normalizedCycle) {
     case 'monthly':
       cycleStart = addMonths(soStartDate, cycleNumber);
       if (billingDay) {
@@ -69,7 +75,10 @@ export function calculateCycleDates(
       break;
 
     default:
-      throw new Error(`Unsupported billing cycle: ${billingCycle}`);
+      console.error(`Unsupported billing cycle: "${billingCycle}" (normalized: "${normalizedCycle}")`);
+      console.error(`Billing cycle length: ${billingCycle.length}, Normalized length: ${normalizedCycle.length}`);
+      console.error(`Billing cycle char codes:`, Array.from(billingCycle).map(c => `${c}:${c.charCodeAt(0)}`));
+      throw new Error(`Unsupported billing cycle: "${billingCycle}". Supported values: monthly, quarterly, halfyearly, yearly`);
   }
 
   return {

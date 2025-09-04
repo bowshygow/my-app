@@ -15,6 +15,38 @@ interface ZohoSalesOrder {
   line_items: ZohoLineItem[];
   total: number;
   currency_code: string;
+  custom_fields?: Array<{
+    field_id: string;
+    customfield_id: string;
+    show_in_store: boolean;
+    show_in_portal: boolean;
+    is_active: boolean;
+    index: number;
+    label: string;
+    show_on_pdf: boolean;
+    edit_on_portal: boolean;
+    edit_on_store: boolean;
+    api_name: string;
+    show_in_all_pdf: boolean;
+    value_formatted: string;
+    search_entity: string;
+    data_type: string;
+    placeholder: string;
+    value: string;
+    is_dependent_field: boolean;
+    is_color_code_supported?: boolean;
+    selected_option_id?: string;
+  }>;
+  custom_field_hash?: {
+    cf_start_date: string;
+    cf_start_date_unformatted: string;
+    cf_end_date: string;
+    cf_end_date_unformatted: string;
+    cf_billing_cycle: string;
+    cf_billing_cycle_unformatted: string;
+    cf_billing_cycle_date: string;
+    cf_billing_cycle_date_unformatted: string;
+  };
 }
 
 interface ZohoLineItem {

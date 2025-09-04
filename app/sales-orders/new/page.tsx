@@ -22,13 +22,14 @@ export default function NewSalesOrderPage() {
         throw new Error('Authentication token not found. Please log in again.');
       }
 
-      // Call the API to fetch sales order from Zoho
-      const response = await fetch(`/api/salesorders/${zohoSoId}`, {
-        method: 'GET',
+      // Call the API to create sales order from Zoho
+      const response = await fetch('/api/salesorders', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
+        body: JSON.stringify({ zohoSoId }),
       });
 
       const data = await response.json();
@@ -112,7 +113,7 @@ export default function NewSalesOrderPage() {
                 id="zohoSoId"
                 value={zohoSoId}
                 onChange={(e) => setZohoSoId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="e.g., 2031676000000083902"
                 required
               />
