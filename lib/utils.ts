@@ -57,7 +57,11 @@ export function firstCycleEndOnOrAfter(
       return new Date(halfYear, 11, 31); // Dec 31
       
     case 'yearly':
-      return new Date(date.getFullYear(), 11, 31); // Dec 31
+      // For yearly billing, align with UAD start date (same month/day next year)
+      const nextYear = date.getFullYear() + 1;
+      const yearlyMonth: number = date.getMonth();
+      const yearlyDay: number = date.getDate();
+      return new Date(nextYear, yearlyMonth, yearlyDay);
       
     default:
       throw new Error(`Unsupported billing cycle: ${billingCycle}`);
@@ -128,7 +132,8 @@ export function calculateCycleDates(
 
 
 /**
- * Calculate prorated amount based on overlap between UAD dates and billing cycle
+ * Calculate prorated amount based on month-by-month proration
+ * Price is per month, so we prorate by actual calendar months
  */
 export function calculateProratedAmount(
   uadStartDate: Date,
@@ -146,19 +151,6 @@ export function calculateProratedAmount(
     return { amount: 0, breakdown: { reason: 'No overlap' } };
   }
 
-  // Calculate denominator based on billing day rules
-  let denominator: number;
-  if (billingDay) {
-    // For monthly cycles with billing day, denominator = billing day (or actual month length if billing day > month length)
-    const monthLength = new Date(cycleStart.getFullYear(), cycleStart.getMonth() + 1, 0).getDate();
-    denominator = Math.min(billingDay, monthLength);
-  } else {
-    // Default to total days in cycle
-    denominator = differenceInDays(cycleEnd, cycleStart) + 1;
-  }
-
-  const activeDays = differenceInDays(overlapEnd, overlapStart) + 1;
-
   // Check if this is a full cycle overlap
   const isFullCycle = (overlapStart.getTime() === cycleStart.getTime() && overlapEnd.getTime() === cycleEnd.getTime());
   
@@ -166,54 +158,48 @@ export function calculateProratedAmount(
     return { amount: fullAmount, breakdown: { reason: 'Full cycle' } };
   }
 
-  const fraction = activeDays / denominator;
-  const proratedAmount = Math.round(fullAmount * fraction * 100) / 100;
-
-  // Generate month-wise breakdown for detailed logging
+  // CORRECTED: Month-by-month proration logic
+  let totalAmount = 0;
   const months: any[] = [];
   let currentDate = new Date(overlapStart);
   
   while (currentDate <= overlapEnd) {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth() + 1;
-    
-    // Find start and end of current month within the overlap period
-    const monthStart = new Date(Math.max(currentDate.getTime(), overlapStart.getTime()));
-    const monthEnd = new Date(Math.min(
-      new Date(year, month, 0).getTime(), // Last day of current month
-      overlapEnd.getTime()
-    ));
-    
     const daysInMonth = new Date(year, month, 0).getDate();
-    const activeDaysInMonth = differenceInDays(monthEnd, monthStart) + 1;
     
-    // Use billing day as denominator for monthly breakdown if specified
-    const monthDenominator = billingDay ? Math.min(billingDay, daysInMonth) : daysInMonth;
-    const monthFraction = activeDaysInMonth / monthDenominator;
+    // Find overlap with current month
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month - 1, daysInMonth);
+    
+    const monthOverlapStart = new Date(Math.max(overlapStart.getTime(), monthStart.getTime()));
+    const monthOverlapEnd = new Date(Math.min(overlapEnd.getTime(), monthEnd.getTime()));
+    
+    const activeDaysInMonth = differenceInDays(monthOverlapEnd, monthOverlapStart) + 1;
+    const monthFraction = activeDaysInMonth / daysInMonth;
     const monthAmount = Math.round(fullAmount * monthFraction * 100) / 100;
     
     months.push({
       year,
       month,
       activeDays: activeDaysInMonth,
-      daysInMonth: monthDenominator,
+      daysInMonth: daysInMonth,
       fraction: Math.round(monthFraction * 10000) / 10000,
       amount: monthAmount
     });
+    
+    totalAmount += monthAmount;
     
     // Move to next month
     currentDate = new Date(year, month, 1);
   }
 
   return {
-    amount: proratedAmount,
+    amount: totalAmount,
     breakdown: {
       reason: 'Prorated',
-      denominator,
-      activeDays,
-      fraction: Math.round(fraction * 10000) / 10000,
       fullAmount,
-      proratedAmount,
+      proratedAmount: totalAmount,
       months
     }
   };

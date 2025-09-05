@@ -240,7 +240,15 @@ async function generateInvoicesForUAD(
             fullAmount
           );
           
-          console.log(`Proration result:`, proration);
+          // Clean debug logs
+          if (proration.breakdown.reason === 'Prorated' && proration.breakdown.months) {
+            console.log(`Month-by-month breakdown:`);
+            proration.breakdown.months.forEach((month: any) => {
+              console.log(`  ${month.year}-${month.month.toString().padStart(2, '0')}: ${month.activeDays}/${month.daysInMonth} days = ${(month.fraction * 100).toFixed(1)}% = ₹${month.amount.toFixed(2)}`);
+            });
+          } else {
+            console.log(`Proration result: ${proration.breakdown.reason}`);
+          }
 
           totalAmount += proration.amount;
           if (proration.breakdown) {
