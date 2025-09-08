@@ -154,7 +154,7 @@ async function syncInvoiceHandler(request: NextRequest, { params }: { params: { 
           id: updatedInvoice.id,
           externalInvoiceNumber: updatedInvoice.externalInvoiceNumber,
           externalInvoiceId: updatedInvoice.externalInvoiceId,
-          externalInvoiceUrl: updatedInvoice.externalInvoiceUrl
+          invoiceUrl: updatedInvoice.invoiceUrl
         },
         zohoResponse: zohoResponse.invoice
       });
