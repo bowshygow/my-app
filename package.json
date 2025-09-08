@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "build": "prisma generate && next build --turbopack",
     "start": "next start",
     "test:invoices": "node run-invoice-tests.js",
-    "test:calculations": "node test-invoice-calculations.js"
+    "test:calculations": "node test-invoice-calculations.js",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.15.0",
