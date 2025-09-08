@@ -65,6 +65,14 @@ interface ZohoInvoiceResponse {
     invoice_id: string;
     invoice_number: string;
     invoice_url: string;
+    date: string;
+    due_date: string;
+    customer_id: string;
+    customer_name: string;
+    currency_code: string;
+    status: string;
+    total: number;
+    balance: number;
   };
 }
 
@@ -162,28 +170,50 @@ class ZohoAPI {
   async createInvoice(invoiceData: {
     customer_id: string;
     custom_fields: Array<{ customfield_id: string; value: string }>;
-    line_items: Array<{ item_id: string; quantity: number }>;
+    line_items: Array<{ item_id: string; quantity: number; rate: number }>;
   }): Promise<ZohoInvoiceResponse> {
     const token = await this.refreshAccessToken();
     
+    const url = `${this.apiDomain}/books/v3/invoices?organization_id=${this.organizationId}`;
+    const requestBody = JSON.stringify(invoiceData);
+    
+    console.log('=== ZOHO BOOKS API REQUEST ===');
+    console.log('URL:', url);
+    console.log('Method: POST');
+    console.log('Headers:', {
+      'Authorization': `Zoho-oauthtoken ${token.substring(0, 20)}...`,
+      'Content-Type': 'application/json'
+    });
+    console.log('Request Body:', requestBody);
+    console.log('=== END ZOHO REQUEST ===');
+    
     try {
-      const response = await fetch(
-        `${this.apiDomain}/books/v3/invoices?organization_id=${this.organizationId}`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Zoho-oauthtoken ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(invoiceData),
-        }
-      );
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Zoho-oauthtoken ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: requestBody,
+      });
+
+      console.log('=== ZOHO HTTP RESPONSE ===');
+      console.log('Status:', response.status);
+      console.log('Status Text:', response.statusText);
+      console.log('Headers:', Object.fromEntries(response.headers.entries()));
+      console.log('=== END HTTP RESPONSE ===');
 
       if (!response.ok) {
-        throw new Error(`Failed to create invoice: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('HTTP Error Response Body:', errorText);
+        throw new Error(`Failed to create invoice: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
+      
+      console.log('=== ZOHO API RESPONSE DATA ===');
+      console.log('Response Data:', JSON.stringify(data, null, 2));
+      console.log('=== END API RESPONSE DATA ===');
       
       if (data.code !== 0) {
         throw new Error(`Zoho API error: ${data.message}`);
@@ -191,7 +221,7 @@ class ZohoAPI {
 
       return data;
     } catch (error) {
-      console.error('Error creating invoice:', error);
+      console.error('Error creating invoice in Zoho:', error);
       throw new Error('Failed to create invoice in Zoho');
     }
   }

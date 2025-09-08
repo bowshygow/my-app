@@ -45,7 +45,6 @@ export default function NewUADPage() {
   });
   const [lineItems, setLineItems] = useState<UADLineItem[]>([]);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | ''; text: string }>({ type: '', text: '' });
-  const [showCalculationPreview, setShowCalculationPreview] = useState(false);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -64,48 +63,6 @@ export default function NewUADPage() {
     });
   };
 
-  const calculateInvoicePreview = () => {
-    if (!selectedSalesOrder || !formData.startDate || !formData.endDate || lineItems.length === 0) {
-      return null;
-    }
-
-    const salesOrder = salesOrders.find(so => so.id === selectedSalesOrder);
-    if (!salesOrder) return null;
-
-    // Calculate total UAD value
-    const totalUADValue = lineItems.reduce((sum, item) => sum + (item.qtyUad * item.rate), 0);
-    
-    // Calculate overlap days with sales order period
-    const soStart = new Date(salesOrder.startDate);
-    const soEnd = new Date(salesOrder.endDate);
-    const uadStart = new Date(formData.startDate);
-    const uadEnd = new Date(formData.endDate);
-    
-    const overlapStart = new Date(Math.max(soStart.getTime(), uadStart.getTime()));
-    const overlapEnd = new Date(Math.min(soEnd.getTime(), uadEnd.getTime()));
-    const overlapDays = Math.max(0, Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-    
-    // Calculate total days in UAD period
-    const totalUADDays = Math.ceil((uadEnd.getTime() - uadStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    
-    // Calculate proration factor
-    const prorationFactor = overlapDays / totalUADDays;
-    const proratedAmount = totalUADValue * prorationFactor;
-
-    return {
-      totalUADValue,
-      overlapDays,
-      totalUADDays,
-      prorationFactor,
-      proratedAmount,
-      isProrated: prorationFactor < 1,
-      lineItems: lineItems.map(item => ({
-        ...item,
-        lineAmount: item.qtyUad * item.rate,
-        proratedAmount: (item.qtyUad * item.rate) * prorationFactor
-      }))
-    };
-  };
 
   useEffect(() => {
     fetchSalesOrders();
@@ -627,135 +584,6 @@ export default function NewUADPage() {
               )}
             </div>
 
-            {/* Invoice Calculation Preview */}
-            {lineItems.length > 0 && formData.startDate && formData.endDate && (
-              <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">📊 Invoice Calculation Preview</h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowCalculationPreview(!showCalculationPreview)}
-                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {showCalculationPreview ? 'Hide Details' : 'Show Details'}
-                  </button>
-                </div>
-
-                {(() => {
-                  const preview = calculateInvoicePreview();
-                  if (!preview) return null;
-
-                  return (
-                    <div className="space-y-4">
-                      {/* Summary */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="p-3 bg-white border border-gray-200 rounded">
-                          <div className="text-sm text-gray-600">Total UAD Value</div>
-                          <div className="text-lg font-semibold text-gray-900">{formatCurrency(preview.totalUADValue)}</div>
-                        </div>
-                        <div className="p-3 bg-white border border-gray-200 rounded">
-                          <div className="text-sm text-gray-600">Overlap Days</div>
-                          <div className="text-lg font-semibold text-gray-900">{preview.overlapDays} / {preview.totalUADDays}</div>
-                        </div>
-                        <div className="p-3 bg-white border border-gray-200 rounded">
-                          <div className="text-sm text-gray-600">Estimated Invoice Amount</div>
-                          <div className="text-lg font-semibold text-green-600">{formatCurrency(preview.proratedAmount)}</div>
-                        </div>
-                      </div>
-
-                      {/* Detailed Breakdown */}
-                      {showCalculationPreview && (
-                        <div className="space-y-4">
-                          {/* Step 1: Date Analysis */}
-                          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                            <h4 className="text-sm font-semibold text-blue-900 mb-2">Step 1: Date Analysis</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="font-medium text-blue-700">Sales Order Period:</span>
-                                <div className="text-blue-800">{formatDate(selectedSO?.startDate || '')} - {formatDate(selectedSO?.endDate || '')}</div>
-                              </div>
-                              <div>
-                                <span className="font-medium text-blue-700">UAD Period:</span>
-                                <div className="text-blue-800">{formatDate(formData.startDate)} - {formatDate(formData.endDate)}</div>
-                              </div>
-                              <div>
-                                <span className="font-medium text-blue-700">Overlap Days:</span>
-                                <div className="text-blue-800">{preview.overlapDays} days</div>
-                              </div>
-                              <div>
-                                <span className="font-medium text-blue-700">Proration Factor:</span>
-                                <div className="text-blue-800">{(preview.prorationFactor * 100).toFixed(2)}%</div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Step 2: Line Item Calculations */}
-                          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                            <h4 className="text-sm font-semibold text-green-900 mb-2">Step 2: Line Item Calculations</h4>
-                            <div className="space-y-2">
-                              {preview.lineItems.map((item, index) => (
-                                <div key={index} className="p-3 bg-white border border-green-100 rounded">
-                                  <div className="text-sm font-medium text-green-900 mb-2">{item.productName}</div>
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                                    <div>
-                                      <span className="text-green-700">Quantity:</span>
-                                      <div className="font-medium">{item.qtyUad.toLocaleString()}</div>
-                                    </div>
-                                    <div>
-                                      <span className="text-green-700">Rate:</span>
-                                      <div className="font-medium">{formatCurrency(item.rate)}</div>
-                                    </div>
-                                    <div>
-                                      <span className="text-green-700">Full Amount:</span>
-                                      <div className="font-medium">{formatCurrency(item.lineAmount)}</div>
-                                    </div>
-                                    <div>
-                                      <span className="text-green-700">Prorated:</span>
-                                      <div className="font-medium">{formatCurrency(item.proratedAmount)}</div>
-                                    </div>
-                                  </div>
-                                  <div className="mt-2 pt-2 border-t border-green-200 text-xs">
-                                    <div className="font-mono text-green-800">
-                                      Formula: {formatCurrency(item.lineAmount)} × {preview.prorationFactor.toFixed(4)} = {formatCurrency(item.proratedAmount)}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Step 3: Final Summary */}
-                          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                            <h4 className="text-sm font-semibold text-yellow-900 mb-2">Step 3: Final Summary</h4>
-                            <div className="space-y-2 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-yellow-800">Total UAD Value:</span>
-                                <span className="font-medium text-yellow-900">{formatCurrency(preview.totalUADValue)}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-yellow-800">Proration Factor:</span>
-                                <span className="font-medium text-yellow-900">{(preview.prorationFactor * 100).toFixed(2)}%</span>
-                              </div>
-                              <div className="pt-2 border-t border-yellow-200">
-                                <div className="flex justify-between">
-                                  <span className="font-semibold text-yellow-900">Estimated Invoice Amount:</span>
-                                  <span className="text-lg font-bold text-yellow-900">{formatCurrency(preview.proratedAmount)}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Note */}
-                          <div className="p-3 bg-gray-100 border border-gray-300 rounded text-sm text-gray-700">
-                            <strong>Note:</strong> This is a preview calculation. The actual invoice amount may vary based on the billing cycle and any additional proration rules applied during invoice generation.
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
 
             <div className="flex justify-end space-x-4 pt-6 border-t">
               <Link
