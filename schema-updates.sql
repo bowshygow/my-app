@@ -36,3 +36,12 @@ CREATE INDEX "idx_salesorder_billing_options" ON "SalesOrder" ("billingCycle", "
 --   - Denominator = actual days in month for proration
 
 
+
+
+
+
+
+
+
+
+

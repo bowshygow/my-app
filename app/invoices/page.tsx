@@ -118,6 +118,12 @@ export default function InvoicesPage() {
               </h1>
             </div>
             <div className="flex items-center space-x-4">
+              <Link
+                href="/invoice-aggregations"
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+              >
+                View Aggregations
+              </Link>
               <span className="text-sm text-gray-500">
                 Invoices are generated automatically when UADs are saved
               </span>

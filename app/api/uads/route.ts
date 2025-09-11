@@ -28,9 +28,20 @@ async function createUADHandler(request: NextRequest) {
       );
     }
 
+    // Generate UAD number
+    const lastUAD = await prisma.uAD.findFirst({
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const nextNumber = lastUAD ? 
+      parseInt(lastUAD.uadNumber?.split('-')[1] || '0') + 1 : 1;
+
+    const uadNumber = `UAD-${nextNumber.toString().padStart(3, '0')}`;
+
     // Create UAD
     const uad = await prisma.uAD.create({
       data: {
+        uadNumber,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
         notes,

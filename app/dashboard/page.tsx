@@ -274,6 +274,15 @@ export default function DashboardPage() {
               <h4 className="font-medium text-gray-900">View Invoices</h4>
               <p className="text-sm text-gray-600">Manage billing</p>
             </Link>
+            
+            <Link
+              href="/churn"
+              className="bg-red-50 border border-red-200 rounded-lg p-4 hover:bg-red-100 transition-colors text-center"
+            >
+              <div className="text-red-600 text-xl mb-2">🔄</div>
+              <h4 className="font-medium text-gray-900">Churn Management</h4>
+              <p className="text-sm text-gray-600">Manage cancellations</p>
+            </Link>
           </div>
         </div>
 

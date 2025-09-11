@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import AggregationView from '@/components/AggregationView';
 
 interface SalesOrder {
   id: string;
@@ -82,15 +83,26 @@ interface SalesOrder {
   }>;
 }
 
-export default function SalesOrderDetailPage({ params }: { params: { id: string } }) {
+export default function SalesOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [salesOrder, setSalesOrder] = useState<SalesOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedInvoices, setExpandedInvoices] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'aggregation'>('overview');
+  const [salesOrderId, setSalesOrderId] = useState<string>('');
 
   useEffect(() => {
-    fetchSalesOrder();
-  }, [params.id]);
+    // Unwrap the params promise
+    params.then((resolvedParams) => {
+      setSalesOrderId(resolvedParams.id);
+    });
+  }, [params]);
+
+  useEffect(() => {
+    if (salesOrderId) {
+      fetchSalesOrder();
+    }
+  }, [salesOrderId]);
 
   const fetchSalesOrder = async () => {
     try {
@@ -100,8 +112,8 @@ export default function SalesOrderDetailPage({ params }: { params: { id: string 
         return;
       }
 
-      console.log('Fetching sales order with ID:', params.id);
-      const response = await fetch(`/api/salesorders/${params.id}`, {
+      console.log('Fetching sales order with ID:', salesOrderId);
+      const response = await fetch(`/api/salesorders/${salesOrderId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -403,7 +415,48 @@ export default function SalesOrderDetailPage({ params }: { params: { id: string 
           )}
         </div>
 
-        {/* Factories */}
+        {/* Tab Navigation */}
+        <div className="bg-white rounded-lg shadow-sm border mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8 px-6">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'overview'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('invoices')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'invoices'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Invoices
+              </button>
+              <button
+                onClick={() => setActiveTab('aggregation')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'aggregation'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Aggregation
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'overview' && (
+          <>
+            {/* Factories */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-900">Factories</h2>
@@ -610,9 +663,8 @@ export default function SalesOrderDetailPage({ params }: { params: { id: string 
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {salesOrder.invoices.map((invoice) => (
-                    <>
+                    <React.Fragment key={invoice.id}>
                       <tr 
-                        key={invoice.id} 
                         className="hover:bg-gray-50 cursor-pointer"
                         onClick={() => toggleInvoiceExpansion(invoice.id)}
                       >
@@ -888,13 +940,56 @@ export default function SalesOrderDetailPage({ params }: { params: { id: string 
                           </td>
                         </tr>
                       )}
-                    </>
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
         </div>
+          </>
+        )}
+
+        {activeTab === 'invoices' && (
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Invoices View</h2>
+            <p className="text-gray-600">This is the dedicated invoices view. The invoice details are shown in the overview tab above.</p>
+          </div>
+        )}
+
+        {activeTab === 'aggregation' && (
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Invoice Aggregation</h2>
+            <p className="text-gray-600 mb-6">
+              This shows aggregated data for all UADs across all factories in this sales order.
+              Quantities are shown as full amounts, while prices are prorated based on actual usage time.
+            </p>
+            
+            {salesOrder.factories.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No factories found. Please create factories first to view aggregation data.</p>
+                <Link
+                  href="/factories/new"
+                  className="mt-2 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
+                >
+                  + Create Factory
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {salesOrder.factories.map((factory) => (
+                  <div key={factory.id} className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">{factory.name}</h3>
+                    <AggregationView
+                      salesOrderId={salesOrder.id}
+                      factoryId={factory.id}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

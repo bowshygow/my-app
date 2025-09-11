@@ -168,6 +168,24 @@ export default function Home() {
               <h4 className="font-medium text-gray-900">Invoices</h4>
               <p className="text-sm text-gray-600">View and manage invoices</p>
             </Link>
+            
+            <Link
+              href="/invoice-aggregations"
+              className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 hover:bg-indigo-100 transition-colors"
+            >
+              <div className="text-indigo-600 text-xl mb-2">📊</div>
+              <h4 className="font-medium text-gray-900">Invoice Aggregations</h4>
+              <p className="text-sm text-gray-600">Combine multiple UAD invoices</p>
+            </Link>
+            
+            <Link
+              href="/churn"
+              className="bg-red-50 border border-red-200 rounded-lg p-4 hover:bg-red-100 transition-colors"
+            >
+              <div className="text-red-600 text-xl mb-2">🔄</div>
+              <h4 className="font-medium text-gray-900">Churn Management</h4>
+              <p className="text-sm text-gray-600">Manage UAD cancellations</p>
+            </Link>
           </div>
         </div>
       </main>

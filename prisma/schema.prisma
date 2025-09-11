@@ -25,6 +25,8 @@ model User {
   factories   Factory[]     @relation("UserFactories")
   uads        UAD[]         @relation("UserUADs")
   invoices    Invoice[]     @relation("UserInvoices")
+  invoiceAggregations InvoiceAggregation[] @relation("UserInvoiceAggregations")
+  churnRequests ChurnRequest[] @relation("UserChurnRequests")
 }
 
 //
@@ -52,6 +54,8 @@ model SalesOrder {
   factories   Factory[]
   uads        UAD[]
   invoices    Invoice[]
+  invoiceAggregations InvoiceAggregation[]
+  churnRequests ChurnRequest[]
 }
 
 //
@@ -124,6 +128,7 @@ model UAD {
 
   lineItems UADLineItem[]
   invoices  Invoice[]
+  churnRequests ChurnRequest[]
 }
 
 //
@@ -169,6 +174,7 @@ model Invoice {
   user      User @relation("UserInvoices", fields: [createdBy], references: [id], onDelete: Cascade)
 
   lineItems InvoiceLineItem[]
+  aggregations AggregatedInvoice[]
 }
 
 //
@@ -184,4 +190,95 @@ model InvoiceLineItem {
 
   invoiceId String
   invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+//
+// 🔗 Invoice Aggregation - groups multiple UAD invoices
+//
+model InvoiceAggregation {
+  id        String   @id @default(cuid())
+  name      String   // User-defined name for the aggregation
+  status    String   @default("Draft") // Draft | Ready | Synced
+  totalAmount Float
+  notes     String?
+  createdAt DateTime @default(now())
+  syncedAt  DateTime?
+  externalInvoiceId  String?   // Zoho Books invoice_id when synced
+  externalInvoiceNumber String? // e.g., "INV-000227"
+  invoiceUrl         String?   // deep link to Zoho invoice
+  customFields       Json?     // store UAD breakdown and metadata
+
+  soId      String
+  salesOrder SalesOrder @relation(fields: [soId], references: [id], onDelete: Cascade)
+
+  createdBy String
+  user      User @relation("UserInvoiceAggregations", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  // Relations
+  aggregatedInvoices AggregatedInvoice[]
+}
+
+//
+// 🔗 Aggregated Invoice - links individual invoices to aggregations
+//
+model AggregatedInvoice {
+  id        String   @id @default(cuid())
+  
+  aggregationId String
+  aggregation   InvoiceAggregation @relation(fields: [aggregationId], references: [id], onDelete: Cascade)
+  
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([aggregationId, invoiceId])
+}
+
+//
+// 🔄 Churn Request - UAD cancellation requests
+//
+model ChurnRequest {
+  id          String   @id @default(cuid())
+  churnType   String   // "end_of_period" | "prorated"
+  effectiveDate DateTime
+  reason      String?
+  notes       String?
+  status      String   @default("Pending") // Pending | Approved | Processed | Cancelled
+  totalRefund Float?   // calculated refund amount for prorated cancellations
+  createdAt   DateTime @default(now())
+  processedAt DateTime?
+  
+  // Financial impact calculation
+  currentPeriodAmount Float    // amount customer would pay for current period
+  refundAmount        Float?   // refund amount (only for prorated)
+  newMonthlyAmount    Float    // new monthly amount after churn
+  
+  soId      String
+  salesOrder SalesOrder @relation(fields: [soId], references: [id], onDelete: Cascade)
+  
+  uadId     String
+  uad       UAD @relation(fields: [uadId], references: [id], onDelete: Cascade)
+  
+  createdBy String
+  user      User @relation("UserChurnRequests", fields: [createdBy], references: [id], onDelete: Cascade)
+  
+  // Relations
+  churnItems ChurnItem[]
+}
+
+//
+// 📦 Churn Item - specific items/quantities to cancel
+//
+model ChurnItem {
+  id          String   @id @default(cuid())
+  zohoItemId  String   // Zoho Books item_id
+  productName String
+  qtyToCancel Int      // quantity to cancel
+  currentQty  Int      // current quantity in UAD
+  rate        Float    // rate per unit
+  lineAmount  Float    // qtyToCancel * rate
+  
+  churnRequestId String
+  churnRequest   ChurnRequest @relation(fields: [churnRequestId], references: [id], onDelete: Cascade)
 }
