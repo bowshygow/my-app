@@ -168,6 +168,25 @@ export default function SalesOrderDetailPage({ params }: { params: Promise<{ id:
     }
   };
 
+  const getSOActivePortion = (invoice: any, salesOrder: SalesOrder) => {
+    const soStart = new Date(salesOrder.startDate);
+    const soEnd = new Date(salesOrder.endDate);
+    const cycleStart = new Date(invoice.cycleStart);
+    const cycleEnd = new Date(invoice.cycleEnd);
+    
+    // Calculate the overlap between SO period and invoice cycle period
+    const overlapStart = new Date(Math.max(soStart.getTime(), cycleStart.getTime()));
+    const overlapEnd = new Date(Math.min(soEnd.getTime(), cycleEnd.getTime()));
+    
+    // Check if there's any overlap
+    if (overlapStart <= overlapEnd) {
+      return `${formatDate(overlapStart.toISOString())} → ${formatDate(overlapEnd.toISOString())}`;
+    } else {
+      return 'No overlap';
+    }
+  };
+
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'draft':
@@ -642,7 +661,7 @@ export default function SalesOrderDetailPage({ params }: { params: Promise<{ id:
                       Invoice Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cycle Period
+                      SO Active Portion
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       UAD Period
@@ -673,7 +692,7 @@ export default function SalesOrderDetailPage({ params }: { params: Promise<{ id:
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            {formatDate(invoice.cycleStart)} - {formatDate(invoice.cycleEnd)}
+                            {getSOActivePortion(invoice, salesOrder)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -756,152 +775,90 @@ export default function SalesOrderDetailPage({ params }: { params: Promise<{ id:
                                 </div>
                               )}
                               
-                              {/* Detailed Calculation Process */}
-                              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                                <h5 className="text-sm font-medium text-gray-900 mb-3">📊 Detailed Calculation Process</h5>
+                              {/* Invoice Summary Card */}
+                              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                                <h5 className="text-lg font-semibold text-gray-900 mb-4">📊 Invoice Summary</h5>
                                 
-                                {/* Step 1: Billing Cycle Analysis */}
-                                <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
-                                  <h6 className="text-sm font-semibold text-gray-900 mb-2">Step 1: Billing Cycle Analysis</h6>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                      <span className="font-medium text-gray-700">Billing Cycle:</span>
-                                      <div className="text-gray-900">{getBillingCycleDisplay(salesOrder.billingCycle, salesOrder.billingDay)}</div>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-gray-700">Cycle Period:</span>
-                                      <div className="text-gray-900">{formatDate(invoice.cycleStart)} - {formatDate(invoice.cycleEnd)}</div>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-gray-700">UAD Period:</span>
-                                      <div className="text-gray-900">{formatDate(invoice.uad.startDate)} - {formatDate(invoice.uad.endDate)}</div>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-gray-700">Overlap Days:</span>
-                                      <div className="text-gray-900">{(() => {
-                                        const cycleStart = new Date(invoice.cycleStart);
-                                        const cycleEnd = new Date(invoice.cycleEnd);
-                                        const uadStart = new Date(invoice.uad.startDate);
-                                        const uadEnd = new Date(invoice.uad.endDate);
+                                {(() => {
+                                  // Calculate key metrics
+                                  const cycleStart = new Date(invoice.cycleStart);
+                                  const cycleEnd = new Date(invoice.cycleEnd);
+                                  const uadStart = new Date(invoice.uad.startDate);
+                                  const uadEnd = new Date(invoice.uad.endDate);
+                                  
+                                  const overlapStart = new Date(Math.max(cycleStart.getTime(), uadStart.getTime()));
+                                  const overlapEnd = new Date(Math.min(cycleEnd.getTime(), uadEnd.getTime()));
+                                  const activeDays = Math.max(0, Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+                                  const totalDays = Math.ceil((cycleEnd.getTime() - cycleStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                                  
+                                  // Calculate base amount (what it would cost for full period)
+                                  const baseAmount = invoice.lineItems?.reduce((sum, item) => sum + (item.qty * item.rate), 0) || 0;
+                                  const prorationFactor = activeDays / totalDays;
+                                  const prorationPercentage = (prorationFactor * 100).toFixed(2);
+                                  
+                                  return (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      {/* Left Column - Key Metrics */}
+                                      <div className="space-y-4">
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                          <h6 className="text-sm font-semibold text-blue-900 mb-3">Period Details</h6>
+                                          <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                              <span className="text-blue-700">Active Period:</span>
+                                              <span className="font-medium text-blue-900">
+                                                {formatDate(overlapStart.toISOString())} → {formatDate(overlapEnd.toISOString())}
+                                              </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-blue-700">Active Days:</span>
+                                              <span className="font-medium text-blue-900">{activeDays} out of {totalDays}</span>
+                                            </div>
+                                          </div>
+                                        </div>
                                         
-                                        const overlapStart = new Date(Math.max(cycleStart.getTime(), uadStart.getTime()));
-                                        const overlapEnd = new Date(Math.min(cycleEnd.getTime(), uadEnd.getTime()));
-                                        const overlapDays = Math.max(0, Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-                                        
-                                        return `${overlapDays} days`;
-                                      })()}</div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Step 2: Rate Calculations */}
-                                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                                  <h6 className="text-sm font-semibold text-blue-900 mb-2">Step 2: Rate Calculations</h6>
-                                  {invoice.lineItems && invoice.lineItems.map((lineItem, index) => (
-                                    <div key={index} className="mb-3 p-2 bg-white border border-blue-100 rounded">
-                                      <div className="text-sm">
-                                        <div className="font-medium text-blue-900 mb-1">{lineItem.productName}</div>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                                          <div>
-                                            <span className="text-blue-700">UAD Qty:</span>
-                                            <div className="font-medium">{lineItem.qty.toLocaleString()}</div>
-                                          </div>
-                                          <div>
-                                            <span className="text-blue-700">Rate/Month:</span>
-                                            <div className="font-medium">{formatCurrency(lineItem.rate)}</div>
-                                          </div>
-                                          <div>
-                                            <span className="text-blue-700">Full Cycle Value:</span>
-                                            <div className="font-medium">{formatCurrency(lineItem.qty * lineItem.rate)}</div>
-                                          </div>
-                                          <div>
-                                            <span className="text-blue-700">Formula:</span>
-                                            <div className="font-mono text-xs">Qty × Rate</div>
+                                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                          <h6 className="text-sm font-semibold text-green-900 mb-3">Calculation</h6>
+                                          <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                              <span className="text-green-700">Base Amount:</span>
+                                              <span className="font-medium text-green-900">{formatCurrency(baseAmount)}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-green-700">Proration:</span>
+                                              <span className="font-medium text-green-900">{prorationPercentage}%</span>
+                                            </div>
+                                            <div className="flex justify-between border-t border-green-200 pt-2">
+                                              <span className="font-semibold text-green-900">Final Amount:</span>
+                                              <span className="text-lg font-bold text-green-900">{formatCurrency(invoice.amount)}</span>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  ))}
-                                </div>
-
-                                {/* Step 3: Proration Details */}
-                                {invoice.prorated && (
-                                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                                    <h6 className="text-sm font-semibold text-yellow-900 mb-2">Step 3: Proration Calculation</h6>
-                                    {(() => {
-                                      const prorationDetails = calculateProrationDetails(invoice);
-                                      if (prorationDetails && prorationDetails.length > 0) {
-                                        return (
-                                          <div className="space-y-3">
-                                            {prorationDetails.map((detail, index) => (
-                                              <div key={index} className="bg-white border border-yellow-100 rounded p-3">
-                                                <div className="text-sm font-medium text-yellow-900 mb-2">
-                                                  {detail.product} - {detail.month}/{detail.year}
-                                                </div>
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                                                  <div>
-                                                    <span className="text-yellow-700">Active Days:</span>
-                                                    <div className="font-medium">{detail.activeDays}/{detail.daysInMonth}</div>
-                                                  </div>
-                                                  <div>
-                                                    <span className="text-yellow-700">Fraction:</span>
-                                                    <div className="font-medium">{(detail.fraction * 100).toFixed(2)}%</div>
-                                                  </div>
-                                                  <div>
-                                                    <span className="text-yellow-700">Full Amount:</span>
-                                                    <div className="font-medium">{formatCurrency(detail.fullMonthAmount)}</div>
-                                                  </div>
-                                                  <div>
-                                                    <span className="text-yellow-700">Prorated:</span>
-                                                    <div className="font-medium">{formatCurrency(detail.amount)}</div>
+                                      
+                                      {/* Right Column - Line Items */}
+                                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                        <h6 className="text-sm font-semibold text-gray-900 mb-3">Line Items</h6>
+                                        {invoice.lineItems && invoice.lineItems.length > 0 ? (
+                                          <div className="space-y-2">
+                                            {invoice.lineItems.map((lineItem, index) => (
+                                              <div key={index} className="flex justify-between items-center p-2 bg-white border border-gray-100 rounded text-sm">
+                                                <div>
+                                                  <div className="font-medium text-gray-900">{lineItem.productName}</div>
+                                                  <div className="text-xs text-gray-500">
+                                                    {lineItem.qty.toLocaleString()} × {formatCurrency(lineItem.rate)}
                                                   </div>
                                                 </div>
-                                                <div className="mt-2 pt-2 border-t border-yellow-200 text-xs">
-                                                  <div className="font-mono text-yellow-800">
-                                                    Formula: {formatCurrency(detail.fullMonthAmount)} × {detail.fraction.toFixed(4)} = {formatCurrency(detail.amount)}
-                                                  </div>
-                                                </div>
+                                                <span className="font-medium text-gray-900">{formatCurrency(lineItem.lineAmount)}</span>
                                               </div>
                                             ))}
                                           </div>
-                                        );
-                                      } else {
-                                        return (
-                                          <div className="text-sm text-yellow-800">
-                                            <p>Proration applied based on date overlap:</p>
-                                            <div className="mt-2 p-2 bg-white border border-yellow-100 rounded">
-                                              <div className="font-mono text-xs">
-                                                Proration Factor = Overlap Days ÷ Total Cycle Days
-                                              </div>
-                                              <div className="mt-1 font-mono text-xs">
-                                                Prorated Amount = Full Amount × Proration Factor
-                                              </div>
-                                            </div>
-                                          </div>
-                                        );
-                                      }
-                                    })()}
-                                  </div>
-                                )}
-
-                                {/* Step 4: Final Calculation Summary */}
-                                <div className="p-3 bg-green-50 border border-green-200 rounded">
-                                  <h6 className="text-sm font-semibold text-green-900 mb-2">Step 4: Final Calculation Summary</h6>
-                                  <div className="space-y-2 text-sm">
-                                    {invoice.lineItems && invoice.lineItems.map((lineItem, index) => (
-                                      <div key={index} className="flex justify-between items-center p-2 bg-white border border-green-100 rounded">
-                                        <span className="text-green-800">{lineItem.productName}</span>
-                                        <span className="font-medium text-green-900">{formatCurrency(lineItem.lineAmount)}</span>
-                                      </div>
-                                    ))}
-                                    <div className="pt-2 border-t border-green-200">
-                                      <div className="flex justify-between items-center">
-                                        <span className="font-semibold text-green-900">Total Invoice Amount:</span>
-                                        <span className="text-lg font-bold text-green-900">{formatCurrency(invoice.amount)}</span>
+                                        ) : (
+                                          <p className="text-sm text-gray-500">No line items available</p>
+                                        )}
                                       </div>
                                     </div>
-                                  </div>
-                                </div>
+                                  );
+                                })()}
                               </div>
                               
                               {/* Full Cycle Details */}

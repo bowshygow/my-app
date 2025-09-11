@@ -60,15 +60,25 @@ export default function FactoriesPage() {
   const router = useRouter();
 
   useEffect(() => {
-    fetchData();
+    // Check if user is logged in
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/auth/login';
+      return;
+    }
+    fetchData(token);
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (token: string) => {
     try {
       setLoading(true);
       const [factoriesRes, salesOrdersRes] = await Promise.all([
-        fetch('/api/factories'),
-        fetch('/api/salesorders')
+        fetch('/api/factories', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('/api/salesorders', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
       ]);
 
       if (!factoriesRes.ok || !salesOrdersRes.ok) {
@@ -231,7 +241,14 @@ export default function FactoriesPage() {
           <div className="text-red-600 text-xl mb-4">⚠️ Error</div>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={fetchData}
+            onClick={() => {
+              const token = localStorage.getItem('token');
+              if (token) {
+                fetchData(token);
+              } else {
+                window.location.href = '/auth/login';
+              }
+            }}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
           >
             Try Again
