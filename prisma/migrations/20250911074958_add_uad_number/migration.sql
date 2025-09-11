@@ -6,12 +6,13 @@
 
 */
 
--- First, add the column as nullable
+-- First, add the columns as nullable
 ALTER TABLE "public"."UAD" ADD COLUMN "uadNumber" TEXT;
+ALTER TABLE "public"."UAD" ADD COLUMN "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 -- Update existing UADs with sequential numbers using a CTE approach
 WITH numbered_uads AS (
-  SELECT id, ROW_NUMBER() OVER (ORDER BY "createdAt") as row_num
+  SELECT id, ROW_NUMBER() OVER (ORDER BY id) as row_num
   FROM "public"."UAD"
   WHERE "uadNumber" IS NULL
 )

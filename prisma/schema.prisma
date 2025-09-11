@@ -112,10 +112,12 @@ model FactoryAllocation {
 //
 model UAD {
   id        String   @id @default(cuid())
+  uadNumber String   @unique // UAD-001, UAD-002, etc.
   startDate DateTime
   endDate   DateTime
   status    String   @default("Draft") // Draft | Active | Ended
   notes     String?
+  createdAt DateTime @default(now())
 
   soId      String
   salesOrder SalesOrder @relation(fields: [soId], references: [id], onDelete: Cascade)

@@ -286,6 +286,48 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Browse All */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Browse All</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link
+              href="/factories"
+              className="bg-green-50 border border-green-200 rounded-lg p-4 hover:bg-green-100 transition-colors text-center"
+            >
+              <div className="text-green-600 text-xl mb-2">🏭</div>
+              <h4 className="font-medium text-gray-900">All Factories</h4>
+              <p className="text-sm text-gray-600">View & manage factories</p>
+            </Link>
+            
+            <Link
+              href="/uads"
+              className="bg-purple-50 border border-purple-200 rounded-lg p-4 hover:bg-purple-100 transition-colors text-center"
+            >
+              <div className="text-purple-600 text-xl mb-2">📄</div>
+              <h4 className="font-medium text-gray-900">All UADs</h4>
+              <p className="text-sm text-gray-600">View & manage UADs</p>
+            </Link>
+            
+            <Link
+              href="/invoice-aggregations"
+              className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 hover:bg-indigo-100 transition-colors text-center"
+            >
+              <div className="text-indigo-600 text-xl mb-2">📊</div>
+              <h4 className="font-medium text-gray-900">Invoice Aggregations</h4>
+              <p className="text-sm text-gray-600">Combine UAD invoices</p>
+            </Link>
+            
+            <Link
+              href="/churn"
+              className="bg-red-50 border border-red-200 rounded-lg p-4 hover:bg-red-100 transition-colors text-center"
+            >
+              <div className="text-red-600 text-xl mb-2">🔄</div>
+              <h4 className="font-medium text-gray-900">Churn Management</h4>
+              <p className="text-sm text-gray-600">Manage cancellations</p>
+            </Link>
+          </div>
+        </div>
+
         {/* All Sales Orders */}
         {salesOrders.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
