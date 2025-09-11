@@ -83,7 +83,7 @@ export default function Home() {
             <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
               This application helps you manage User Acceptance Documents (UADs) and generate 
               prorated invoices based on billing cycles. Integrate with Zoho Books for seamless 
-              invoice management.
+              invoice management with automatic aggregation.
             </p>
             <div className="flex justify-center space-x-4">
               <Link
@@ -124,7 +124,7 @@ export default function Home() {
             <div className="text-purple-600 text-2xl mb-4">💰</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Smart Invoicing</h3>
             <p className="text-gray-600 text-sm">
-              Generate prorated invoices based on UAD dates and billing cycles with automatic calculations.
+              Generate prorated invoices based on UAD dates and billing cycles with automatic aggregation.
             </p>
           </div>
         </div>
@@ -132,7 +132,7 @@ export default function Home() {
         {/* Quick Actions */}
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <Link
               href="/sales-orders"
               className="bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition-colors"
@@ -167,15 +167,6 @@ export default function Home() {
               <div className="text-orange-600 text-xl mb-2">💰</div>
               <h4 className="font-medium text-gray-900">Invoices</h4>
               <p className="text-sm text-gray-600">View and manage invoices</p>
-            </Link>
-            
-            <Link
-              href="/invoice-aggregations"
-              className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 hover:bg-indigo-100 transition-colors"
-            >
-              <div className="text-indigo-600 text-xl mb-2">📊</div>
-              <h4 className="font-medium text-gray-900">Invoice Aggregations</h4>
-              <p className="text-sm text-gray-600">Combine multiple UAD invoices</p>
             </Link>
             
             <Link

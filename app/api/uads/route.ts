@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { calculateCycleDates, calculateProratedAmount } from '@/lib/utils';
+import { createAutomaticAggregation } from '@/lib/aggregation';
 
 async function createUADHandler(request: NextRequest) {
   try {
@@ -32,19 +33,27 @@ async function createUADHandler(request: NextRequest) {
     let lastUAD;
     try {
       lastUAD = await prisma.uAD.findFirst({
-        orderBy: { createdAt: 'desc' }
-      });
-    } catch (error) {
-      // Fallback to ordering by ID if createdAt doesn't exist
-      lastUAD = await prisma.uAD.findFirst({
         orderBy: { id: 'desc' }
       });
+    } catch (error) {
+      // Fallback to basic query
+      const uads = await prisma.uAD.findMany({
+        take: 1,
+        orderBy: { id: 'desc' }
+      });
+      lastUAD = uads.length > 0 ? uads[0] : null;
     }
 
-    const nextNumber = lastUAD ? 
-      parseInt(lastUAD.uadNumber?.split('-')[1] || '0') + 1 : 1;
-
-    const uadNumber = `UAD-${nextNumber.toString().padStart(3, '0')}`;
+    // Generate UAD number safely
+    let uadNumber = 'UAD-001';
+    try {
+      if (lastUAD && (lastUAD as any).uadNumber) {
+        const nextNumber = parseInt((lastUAD as any).uadNumber?.split('-')[1] || '0') + 1;
+        uadNumber = `UAD-${nextNumber.toString().padStart(3, '0')}`;
+      }
+    } catch (error) {
+      console.log('UAD number generation failed, using default:', error);
+    }
 
     // Create UAD - try with uadNumber first, fallback to without it
     let uad;
@@ -58,7 +67,7 @@ async function createUADHandler(request: NextRequest) {
           soId: salesOrderId,
           factoryId: factoryId || null,
           createdBy: user.userId,
-        },
+        } as any,
       });
     } catch (error) {
       // Fallback: create without uadNumber if the field doesn't exist
@@ -70,7 +79,7 @@ async function createUADHandler(request: NextRequest) {
           soId: salesOrderId,
           factoryId: factoryId || null,
           createdBy: user.userId,
-        },
+        } as any,
       });
     }
 
@@ -89,6 +98,15 @@ async function createUADHandler(request: NextRequest) {
 
     // Generate invoices for the UAD period
     const invoices = await generateInvoicesForUAD(uad.id, salesOrder, user.userId);
+
+    // 🚀 NEW: Create automatic aggregation
+    try {
+      await createAutomaticAggregation(uad.id, salesOrder, user.userId);
+      console.log(`✅ Automatic aggregation created for UAD: ${uad.id}`);
+    } catch (aggregationError) {
+      console.error('⚠️ Automatic aggregation failed, but UAD creation succeeded:', aggregationError);
+      // Don't fail UAD creation if aggregation fails
+    }
 
     // Fetch complete UAD with relations
     const completeUAD = await prisma.uAD.findUnique({

@@ -309,12 +309,12 @@ export default function DashboardPage() {
             </Link>
             
             <Link
-              href="/invoice-aggregations"
+              href="/auto-aggregations"
               className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 hover:bg-indigo-100 transition-colors text-center"
             >
-              <div className="text-indigo-600 text-xl mb-2">📊</div>
-              <h4 className="font-medium text-gray-900">Invoice Aggregations</h4>
-              <p className="text-sm text-gray-600">Combine UAD invoices</p>
+              <div className="text-indigo-600 text-xl mb-2">🤖</div>
+              <h4 className="font-medium text-gray-900">Auto-Aggregations</h4>
+              <p className="text-sm text-gray-600">View automatic aggregations</p>
             </Link>
             
             <Link
@@ -390,7 +390,7 @@ export default function DashboardPage() {
                     <p className="text-sm font-medium text-gray-900">
                       Sales Order {so.soNumber} created for {so.customerName}
                     </p>
-                                         <p className="text-xs text-gray-500">
+                                     <p className="text-xs text-gray-500">
                        {formatDate(new Date(so.createdAt))}
                      </p>
                   </div>
@@ -403,7 +403,7 @@ export default function DashboardPage() {
                     <p className="text-sm font-medium text-gray-900">
                       Factory {factory.name} created for {factory.salesOrder.soNumber}
                     </p>
-                                         <p className="text-xs text-gray-500">
+                                     <p className="text-xs text-gray-500">
                        {formatDate(new Date(factory.createdAt))}
                      </p>
                   </div>
