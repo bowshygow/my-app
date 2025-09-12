@@ -56,6 +56,7 @@ export default function FactoriesPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [expandedFactory, setExpandedFactory] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -221,6 +222,10 @@ export default function FactoriesPage() {
     setStatusFilter('all');
     setDateRange({ start: '', end: '' });
     setCurrentPage(1);
+  };
+
+  const toggleFactoryDetails = (factoryId: string) => {
+    setExpandedFactory(expandedFactory === factoryId ? null : factoryId);
   };
 
   if (loading) {
@@ -477,80 +482,164 @@ export default function FactoriesPage() {
                   {paginatedFactories.map((factory) => {
                     const uadCounts = getUADStatusCounts(factory);
                     const totalValue = getTotalValue(factory);
+                    const isExpanded = expandedFactory === factory.id;
                     
                     return (
-                      <tr key={factory.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {factory.name}
-                            </div>
-                            {factory.notes && (
-                              <div className="text-sm text-gray-500 truncate max-w-xs">
-                                {factory.notes}
+                      <>
+                        <tr key={factory.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {factory.name}
                               </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {factory.salesOrder.soNumber}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {factory.salesOrder.customerName}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex space-x-2">
-                            {uadCounts.active > 0 && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                {uadCounts.active} Active
-                              </span>
-                            )}
-                            {uadCounts.draft > 0 && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                {uadCounts.draft} Draft
-                              </span>
-                            )}
-                            {uadCounts.ended > 0 && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                {uadCounts.ended} Ended
-                              </span>
-                            )}
-                            {factory.uads.length === 0 && (
-                              <span className="text-sm text-gray-500">No UADs</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {factory.allocations.length} products
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {factory.allocations.reduce((sum, a) => sum + a.qtyFactory, 0)} total qty
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(totalValue)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(factory.createdAt)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button
-                            onClick={() => router.push(`/factories/${factory.id}`)}
-                            className="text-blue-600 hover:text-blue-900 mr-3"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() => router.push(`/uads/new?factoryId=${factory.id}`)}
-                            className="text-green-600 hover:text-green-900"
-                          >
-                            Create UAD
-                          </button>
-                        </td>
-                      </tr>
+                              {factory.notes && (
+                                <div className="text-sm text-gray-500 truncate max-w-xs">
+                                  {factory.notes}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {factory.salesOrder.soNumber}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {factory.salesOrder.customerName}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex space-x-2">
+                              {uadCounts.active > 0 && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  {uadCounts.active} Active
+                                </span>
+                              )}
+                              {uadCounts.draft > 0 && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  {uadCounts.draft} Draft
+                                </span>
+                              )}
+                              {uadCounts.ended > 0 && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                  {uadCounts.ended} Ended
+                                </span>
+                              )}
+                              {factory.uads.length === 0 && (
+                                <span className="text-sm text-gray-500">No UADs</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {factory.allocations.length} products
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {factory.allocations.reduce((sum, a) => sum + a.qtyFactory, 0)} total qty
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(totalValue)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(factory.createdAt)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => router.push(`/factories/${factory.id}`)}
+                              className="text-blue-600 hover:text-blue-900 mr-3"
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={() => toggleFactoryDetails(factory.id)}
+                              className="text-gray-600 hover:text-gray-900"
+                            >
+                              {isExpanded ? '▼' : '▶'} Details
+                            </button>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={7} className="px-6 py-4 bg-gray-50">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {/* Allocations Details */}
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-900 mb-3">Allocations</h4>
+                                  <div className="space-y-2">
+                                    {factory.allocations.map((allocation) => (
+                                      <div key={allocation.id} className="flex justify-between items-center text-sm">
+                                        <span className="text-gray-600 truncate max-w-32">
+                                          {allocation.productName}
+                                        </span>
+                                        <div className="text-right">
+                                          <div className="text-gray-900">
+                                            {allocation.qtyFactory} × {formatCurrency(allocation.rate)}
+                                          </div>
+                                          <div className="text-gray-500">
+                                            = {formatCurrency(allocation.qtyFactory * allocation.rate)}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* UADs Details */}
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-900 mb-3">UADs</h4>
+                                  <div className="space-y-2">
+                                    {factory.uads.length > 0 ? (
+                                      factory.uads.map((uad) => (
+                                        <div key={uad.id} className="flex justify-between items-center text-sm">
+                                          <div>
+                                            <span className="text-gray-900 font-medium">
+                                              {uad.uadNumber || `UAD-${uad.id.slice(-4)}`}
+                                            </span>
+                                            <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                              uad.status === 'Active' ? 'bg-green-100 text-green-800' :
+                                              uad.status === 'Draft' ? 'bg-yellow-100 text-yellow-800' :
+                                              'bg-gray-100 text-gray-800'
+                                            }`}>
+                                              {uad.status}
+                                            </span>
+                                          </div>
+                                          <div className="text-gray-500 text-xs">
+                                            {formatDate(uad.startDate)} - {formatDate(uad.endDate)}
+                                          </div>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="text-sm text-gray-500">No UADs created yet</div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Invoices Summary */}
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-900 mb-3">Invoices</h4>
+                                  <div className="space-y-2">
+                                    {factory.invoices.length > 0 ? (
+                                      <>
+                                        <div className="text-sm text-gray-600">
+                                          {factory.invoices.length} invoices generated
+                                        </div>
+                                        <div className="text-sm text-gray-600">
+                                          Total: {formatCurrency(factory.invoices.reduce((sum, inv) => sum + inv.amount, 0))}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                          Latest: {formatDate(factory.invoices[0]?.invoiceDate)}
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <div className="text-sm text-gray-500">No invoices generated yet</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     );
                   })}
                 </tbody>

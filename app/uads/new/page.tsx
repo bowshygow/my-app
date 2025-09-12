@@ -63,6 +63,14 @@ export default function NewUADPage() {
     });
   };
 
+  const formatDateDDMMYYYY = (dateString: string) => {
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
 
   useEffect(() => {
     fetchSalesOrders();
@@ -447,11 +455,11 @@ export default function NewUADPage() {
                 <div className="text-sm text-blue-800">
                   <div className="flex justify-between">
                     <span>Start Date:</span>
-                    <span>{new Date(selectedSO.startDate).toLocaleDateString()}</span>
+                    <span>{formatDateDDMMYYYY(selectedSO.startDate)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>End Date:</span>
-                    <span>{new Date(selectedSO.endDate).toLocaleDateString()}</span>
+                    <span>{formatDateDDMMYYYY(selectedSO.endDate)}</span>
                   </div>
             </div>
             </div>
